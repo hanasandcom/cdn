@@ -38,7 +38,10 @@ export async function storageStatus() {
     if (used >= storageLimit * 0.8) warnings.push('Upload storage is above 80% capacity.')
     if (free < reserveBytes * 2) warnings.push('Upload filesystem has less than 20 GiB free.')
     if (recent >= GiB) warnings.push('More than 1 GiB was uploaded in 15 minutes.')
-    return { ok: warnings.length === 0, usedBytes: used, limitBytes: storageLimit, freeBytes: free, recentBytes: recent, warnings }
+    // Capacity warnings are degraded operation, not failed health: upload limits
+    // are enforced separately by persistFile, while this endpoint checks that
+    // the filesystem and database are reachable.
+    return { ok: true, usedBytes: used, limitBytes: storageLimit, freeBytes: free, recentBytes: recent, warnings }
 }
 
 // Serialize reservations across processes, including replacement uploads.

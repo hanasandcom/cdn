@@ -63,7 +63,9 @@ test('path collision cleans its disk write without replacing the original', asyn
 test('storage pressure warns before capacity and blocks writes at the limit', async () => {
     const id = (await pool.query('SELECT id FROM files WHERE path=\'roundtrip\'')).rows[0].id
     await pool.query('UPDATE files SET storage_size=$2 WHERE id=$1',[id,Math.floor(storageLimit*.85)])
-    expect((await storageStatus()).ok).toBe(false)
+    const status = await storageStatus()
+    expect(status.ok).toBe(true)
+    expect(status.warnings).toContain('Upload storage is above 80% capacity.')
     await expect(persistFile('different-owner',Buffer.alloc(storageLimit*.2),async () => {})).rejects.toBeInstanceOf(StorageError)
     await pool.query('UPDATE files SET storage_size=9 WHERE id=$1',[id])
 })
