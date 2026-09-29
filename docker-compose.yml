@@ -64,6 +64,11 @@ services:
       DB_PASSWORD: ${DB_PASSWORD}
       DB_NAME: cdn
       DB_HOST: postgres
+    healthcheck:
+      test: ["CMD", "pgrep", "-x", "crond"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
 
 volumes:
   data:
