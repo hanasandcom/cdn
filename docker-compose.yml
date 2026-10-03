@@ -1,3 +1,5 @@
+name: cdn
+
 services:
   cdn:
     container_name: cdn

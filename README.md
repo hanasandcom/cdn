@@ -1,6 +1,13 @@
 # cdn.hanasand.com
 Hanasand CDN
 
+## Deploy
+
+Run `./scripts/deploy-cdn.sh` from any working directory to build and update
+only the CDN service and start its PostgreSQL dependency if needed. It always
+uses the separate `cdn` Compose project; the Hanasand application deployment
+does not build, recreate, or remove CDN services.
+
 ## File library storage
 
 New authenticated uploads are written to the `cdn_data` volume mounted at
