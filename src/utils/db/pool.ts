@@ -14,16 +14,24 @@ const {
 
 const { Pool } = pg
 
-const pool = new Pool({
+const poolOptions = {
     user: DB_USER || 'cdn',
     host: DB_HOST,
     database: DB || 'cdn',
     password: DB_PASSWORD,
     port: Number(DB_PORT) || 5432,
-    max: Number(DB_MAX_CONN) || 20,
     idleTimeoutMillis: Number(DB_IDLE_TIMEOUT_MS) || 5000,
     connectionTimeoutMillis: Number(DB_TIMEOUT_MS) || 3000,
     keepAlive: true,
+}
+
+const pool = new Pool({ ...poolOptions, max: Number(DB_MAX_CONN) || 20 })
+
+// Traffic logging is bursty and lower priority than storage and health checks.
+// Keep its writes in a small pool so it cannot occupy every application slot.
+export const trafficPool = new Pool({
+    ...poolOptions,
+    max: Number(process.env.CDN_TRAFFIC_DB_MAX_CONN) || 5,
 })
 
 export default pool

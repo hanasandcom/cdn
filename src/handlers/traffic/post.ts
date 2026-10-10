@@ -1,4 +1,4 @@
-import run from '#db'
+import { trafficPool } from '#utils/db/pool.ts'
 import type { FastifyReply, FastifyRequest } from 'fastify'
 import updateRollups from './updateRollups.ts'
 
@@ -53,7 +53,7 @@ export default async function postRequest(req: FastifyRequest, res: FastifyReply
             referer || null,
         ]
 
-        const result = await run(query, params)
+        const result = await trafficPool.query(query, params)
 
         try {
             await updateRollups({ domain, ip, user_agent, path: logPath })
