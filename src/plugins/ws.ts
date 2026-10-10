@@ -3,8 +3,6 @@ import type { FastifyInstance, FastifyRequest } from 'fastify'
 import registerClient from '#utils/ws/registerClient.ts'
 import removeClient from '#utils/ws/removeClient.ts'
 import handleShareMessage from '#utils/ws/handleShareMessage.ts'
-import handleTerminalMessage from '#utils/ws/handleTerminalMessage.ts'
-import followShell, { shellClients } from '#utils/ws/followShell.ts'
 
 export default fp(async function wsSharePlugin(fastify: FastifyInstance) {
     fastify.register(async function (fastify) {
@@ -23,33 +21,6 @@ export default fp(async function wsSharePlugin(fastify: FastifyInstance) {
             connection.on('close', () => {
                 removeClient(id, connection)
             })
-        })
-
-        fastify.get('/api/ws/share/:name/shell/:user/:id', { websocket: true }, async (connection, req: FastifyRequest) => {
-            try {
-                const { id, name, user } = (req.params as { id: string, name: string, user: string })
-                const roomId = name
-
-                registerClient(roomId, connection, shellClients)
-
-                followShell(connection, roomId, name, user, id)
-
-                connection.on('message', (message) => {
-                    handleTerminalMessage(roomId, connection, message)
-                })
-
-                connection.on('error', (error) => {
-                    removeClient(roomId, connection, shellClients)
-                    console.log(error)
-                })
-
-                connection.on('close', () => {
-                    removeClient(roomId, connection, shellClients)
-                })
-            } catch (error) {
-                connection.send(Buffer.from(JSON.stringify(error)))
-                console.log(error)
-            }
         })
 
         fastify.get('/api/ws/tps/:id', { websocket: true }, async (connection, req: FastifyRequest) => {

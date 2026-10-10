@@ -14,6 +14,15 @@ const {
 
 const { Pool } = pg
 
+// Keep every CDN PostgreSQL connection inside one budget, including bursty
+// traffic writes. The default matches the Hanasand API's configured limit.
+const maxConnections = Number(DB_MAX_CONN) || 100
+const trafficConnections = Math.min(
+    Number(process.env.CDN_TRAFFIC_DB_MAX_CONN) || 5,
+    Math.max(1, maxConnections - 1),
+)
+const appConnections = maxConnections - trafficConnections
+
 const poolOptions = {
     user: DB_USER || 'cdn',
     host: DB_HOST,
@@ -25,13 +34,13 @@ const poolOptions = {
     keepAlive: true,
 }
 
-const pool = new Pool({ ...poolOptions, max: Number(DB_MAX_CONN) || 20 })
+const pool = new Pool({ ...poolOptions, max: appConnections })
 
 // Traffic logging is bursty and lower priority than storage and health checks.
 // Keep its writes in a small pool so it cannot occupy every application slot.
 export const trafficPool = new Pool({
     ...poolOptions,
-    max: Number(process.env.CDN_TRAFFIC_DB_MAX_CONN) || 5,
+    max: trafficConnections,
 })
 
 export default pool

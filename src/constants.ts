@@ -5,7 +5,6 @@ dotenv.config()
 const requiredEnvironmentVariables = [
     'DB_PASSWORD',
     'DB_HOST',
-    'VM_TOKEN',
     'VM_API_TOKEN'
 ]
 
@@ -35,11 +34,8 @@ const config = {
     DB_PASSWORD: process.env.DB_PASSWORD,
     CACHE_TTL_HOT: 5000,
     CACHE_TTL_COLD: 300000,
-    api: process.env.API_URL || process.env.NEXT_PUBLIC_API || 'https://api.hanasand.com/api',
-    internal_api: process.env.INTERNAL_API || 'https://internal.hanasand.com/api',
-    internal_wss: process.env.INTERNAL_WSS || 'wss://internal.hanasand.com/api/ws',
-    vm_token: process.env.VM_TOKEN,
-    vm_api_token: process.env.VM_API_TOKEN
+    auth_api: (process.env.CDN_AUTH_API_URL || 'http://identity:8081/api').replace(/\/+$/, ''),
+    vm_api_token: process.env.VM_API_TOKEN,
 }
 
 export default config

@@ -15,10 +15,14 @@ services:
     env_file:
       .env
     environment:
-      API_URL: ${API_URL:-https://api.hanasand.com/api}
+      # Keep CDN's own PostgreSQL budget independent of Hanasand's DB pool.
+      DB_MAX_CONN: ${CDN_DB_MAX_CONN:-100}
       DB_HOST: postgres
-      INTERNAL_API: ${INTERNAL_API:-https://internal.hanasand.com/api}
-      INTERNAL_WSS: ${INTERNAL_WSS:-wss://internal.hanasand.com/api/ws}
+      VM_API_TOKEN: ${VM_API_TOKEN}
+      CDN_AUTH_API_URL: ${CDN_AUTH_API_URL:-http://identity:8081/api}
+    networks:
+      - default
+      - identity
     volumes:
       - data:/var/lib/cdn/files
     healthcheck:
@@ -32,7 +36,7 @@ services:
   postgres:
     container_name: cdn_database
     image: postgres:15
-    command: ["postgres", "-c", "shared_preload_libraries="]
+    command: ["postgres", "-c", "shared_preload_libraries=", "-c", "max_connections=${CDN_POSTGRES_MAX_CONN:-120}"]
     mem_limit: 1g
     cpus: "2.0"
     restart: always
@@ -76,3 +80,7 @@ volumes:
   data:
     name: cdn_data
   postgres_data:
+networks:
+  identity:
+    external: true
+    name: ${CDN_AUTH_NETWORK:-hanasand_identity_proxy}

@@ -2,7 +2,7 @@ import config from '#constants'
 
 export default async function hasRole({ id, role, token }: { id: string, role: string, token?: string }): Promise<boolean> {
     try {
-        const response = await fetch(`${config.api}/roles/user/${id}`, {
+        const response = await fetch(`${config.auth_api}/roles/user/${encodeURIComponent(id)}`, {
             headers: token
                 ? {
                     Authorization: `Bearer ${token}`,

@@ -34,7 +34,6 @@ import lockProject from './handlers/project/lock.ts'
 import unlockProject from './handlers/project/unlock.ts'
 import deleteProject from './handlers/project/delete.ts'
 import getUserShares from './handlers/shares/getUserShares.ts'
-import requestFromShareVm from './handlers/shares/request.ts'
 import getUserProjects from './handlers/project/getUserProjects.ts'
 import getShareEditors from './handlers/shares/getShareEditors.ts'
 import getProjectEditors from './handlers/project/getProjectEditors.ts'
@@ -76,7 +75,6 @@ export default async function apiRoutes(fastify: FastifyInstance) {
     fastify.get('/share/editors/add/:id', addShareEditors)
     fastify.get('/share/editors/remove/:id', removeShareEditors)
     fastify.get('/share/lock/:id', lockShare)
-    fastify.post('/share/request/:id', requestFromShareVm)
     fastify.put('/share/:id', putShare)
     fastify.post('/share', postShare)
     fastify.delete('/share/:id', deleteShare)
