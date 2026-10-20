@@ -7,11 +7,12 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url))
 dotenv.config({ path: path.resolve(__dirname, '../.env') })
 const hanasandEnv = dotenv.config({ path: path.resolve(__dirname, '../../hanasand/.env') })
 
+const args = process.argv.slice(2)
 const started = performance.now()
 const apiBase = process.env.STATUS_API_BASE || process.env.API_URL || 'http://127.0.0.1:8080/api'
 const token = process.env.STATUS_INGEST_TOKEN || hanasandEnv.parsed?.VM_API_TOKEN || process.env.VM_API_TOKEN || ''
 
-function postStatus(status, message) {
+function postStatus(status: 'up' | 'down', message: string): Promise<void> {
     if (!token) return Promise.resolve()
 
     return fetch(`${apiBase}/status/ingest`, {
@@ -22,22 +23,34 @@ function postStatus(status, message) {
         },
         body: JSON.stringify({
             service: 'cdn',
-            check_name: 'API audit',
+            check_name: 'Playwright traffic',
             status,
             latency_ms: Math.round(performance.now() - started),
             message,
         }),
-    }).catch(() => {})
+    })
+        .then(async response => {
+            if (!response.ok) {
+                console.error(`Failed to publish CDN Playwright status: ${response.status} ${await response.text()}`)
+            }
+        })
+        .catch(error => {
+            console.error(`Failed to publish CDN Playwright status: ${error}`)
+        })
 }
 
-const child = spawn('node', ['scripts/audit-cdn-api.mjs'], {
+const child = spawn('npx', ['playwright', 'test', ...args], {
     stdio: 'inherit',
     env: process.env,
 })
 
-const code = await new Promise(resolve => {
+const code = await new Promise<number | null>(resolve => {
     child.on('close', resolve)
 })
 
-await postStatus(code === 0 ? 'up' : 'down', code === 0 ? 'CDN API audit passed.' : `CDN API audit failed with exit code ${code}.`)
+const status = code === 0 ? 'up' : 'down'
+const message = code === 0
+    ? 'CDN Playwright traffic checks passed.'
+    : `CDN Playwright traffic checks failed with exit code ${code}.`
+await postStatus(status, message)
 process.exit(code ?? 1)

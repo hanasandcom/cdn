@@ -1,6 +1,7 @@
 import type { FastifyReply, FastifyRequest } from 'fastify'
 import run from '#db'
 import { fileBody } from '#utils/fileStorage.ts'
+import { fileResponseHeaders } from '#utils/fileResponse.ts'
 
 export default async function getFileByPath(req: FastifyRequest, res: FastifyReply) {
     const { id } = req.params as { id: string }
@@ -16,13 +17,10 @@ export default async function getFileByPath(req: FastifyRequest, res: FastifyRep
         }
 
         const file = result.rows[0]
-        res.header('Content-Type', file.type)
-        res.header('Content-Disposition', `inline; filename="${file.name}"`)
-        res.header('X-Content-Type-Options', 'nosniff')
-        res.header('Cache-Control', 'public, max-age=60')
+        res.headers(fileResponseHeaders(file.name, file.type))
         return res.send(fileBody(file))
     } catch (error) {
-        console.log(error)
+        req.log.error({ error }, 'File read failed')
         res.status(500).send({ error: 'Internal server error' })
     }
 }

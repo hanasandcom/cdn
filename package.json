@@ -1,6 +1,6 @@
 {
   "name": "cdn",
-  "version": "1.2:0",
+  "version": "1.2.0",
   "description": "CDN for hanasand.com",
   "license": "ISC",
   "author": "Eirik Hanasand",
@@ -9,9 +9,9 @@
   "scripts": {
     "start": "bun src/index.ts",
     "lint": "eslint --fix ./src",
-    "test:e2e": "bun scripts/run-playwright-status.mjs",
-    "test:e2e:traffic": "bun scripts/run-playwright-status.mjs tests/traffic.spec.ts",
-    "audit:api": "bun scripts/run-audit-status.mjs"
+    "test:e2e": "bun scripts/run-playwright-status.ts",
+    "test:e2e:traffic": "bun scripts/run-playwright-status.ts tests/traffic.spec.ts",
+    "audit:api": "bun scripts/run-audit-status.ts"
   },
   "dependencies": {
     "@eslint/js": "^10.0.1",

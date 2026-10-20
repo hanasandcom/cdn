@@ -4,6 +4,7 @@ import routes from './routes.ts'
 import health from './handlers/index/health.ts'
 import { prepareStorage } from '#utils/fileStorage.ts'
 import getIndex from './handlers/index/get.ts'
+import { getGalleryPage, getUploadPage } from './handlers/index/staticPages.ts'
 import getRobotsTxt from './handlers/index/getRobotsTxt.ts'
 import websocketPlugin from '@fastify/websocket'
 import fastifyMultipart from '@fastify/multipart'
@@ -31,7 +32,9 @@ fastify.register(fastifyMultipart, {
 })
 
 fastify.register(cors, {
-    origin: true,
+    origin: (process.env.CDN_CORS_ORIGINS || 'https://hanasand.com,https://www.hanasand.com')
+        .split(',').map(origin => origin.trim()).filter(Boolean)
+        .concat(process.env.NODE_ENV === 'production' ? [] : ['http://localhost:3000']),
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'HEAD']
 })
 
@@ -57,6 +60,8 @@ fastify.register(ws, { prefix: '/api' })
 fastify.register(routes, { prefix: '/api' })
 
 fastify.get('/', getIndex)
+fastify.get('/upload', getUploadPage)
+fastify.get('/gallery', getGalleryPage)
 fastify.get('/health', health)
 fastify.get('/robots.txt', getRobotsTxt)
 

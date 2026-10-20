@@ -18,13 +18,22 @@ export default async function postFile(req: FastifyRequest, res: FastifyReply) {
             if (part.type === 'file') data = await part.toBuffer()
             else if (['name', 'description', 'path', 'type'].includes(part.fieldname)) fields[part.fieldname] = String(part.value)
         }
-        if (!fields.name || !fields.type || !data) return res.status(400).send({ error: 'Missing name, file, or type.' })
+        if (!fields.name || !data) return res.status(400).send({ error: 'Missing name or file.' })
+        if (fields.name.length > 255 || /[\r\n\0]/.test(fields.name)) return res.status(400).send({ error: 'Invalid file name.' })
+        if ((fields.description?.length || 0) > 1024) return res.status(400).send({ error: 'Description is too long.' })
+        if ((fields.path?.length || 0) > 180 || /[\r\n\0]/.test(fields.path || '')) {
+            return res.status(400).send({ error: 'Invalid file path.' })
+        }
+        const type = fields.type || 'application/octet-stream'
+        if (type.length > 120 || !/^[\w.+-]+\/[\w.+-]+(?:\s*;\s*[\w=.+-]+)*$/.test(type)) {
+            return res.status(400).send({ error: 'Invalid file type.' })
+        }
         const id = randomUUID()
         const path = fields.path || id
         await persistFile(auth.id, data, async (client, key) => {
             await client.query(`INSERT INTO files (id,name,description,data,path,type,owner,storage_key,storage_size)
                 VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)`,
-            [id, fields.name, fields.description || null, Buffer.alloc(0), path, fields.type, auth.id, key, data!.length])
+            [id, fields.name, fields.description || null, Buffer.alloc(0), path, type, auth.id, key, data!.length])
         })
         return res.send({ id, path, owner: auth.id })
     } catch (error) {
