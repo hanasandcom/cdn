@@ -20,7 +20,7 @@ docker compose down
 
 The CDN API is published on port `8501` and its database on `8502`. Do not expose the database port to untrusted networks. Compose reads optional settings from `.env`; see `docker-compose.yml` for defaults and network names.
 
-Uploads return a public share URL at `https://cdn.hanasand.com/api/files/<file-id>`. Supported image and video types render inline. The gallery uses the shared Hanasand Identity cookies to validate the session server-side, and shows previews for supported images. The legacy `/files/<file-id>` address redirects to the canonical API URL. Gallery, upload, and sign-in pages bypass Varnish caching so released UI changes appear immediately.
+Uploads return a public share URL at `https://cdn.hanasand.com/api/files/<file-id>`. Supported image and video types render inline. The gallery uses the shared Hanasand Identity cookies to validate the session server-side, opens as an image grid, and shows file details only after a tile is opened. The legacy `/files/<file-id>` address redirects to the canonical API URL. Gallery, upload, and sign-in pages bypass Varnish caching so released UI changes appear immediately.
 
 ## Development
 

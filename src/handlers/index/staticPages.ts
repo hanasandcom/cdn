@@ -15,8 +15,16 @@ form { display: grid; gap: .5rem; }
 button { border: 0; background: #f6f6f3; color: #111; font-weight: 600; cursor: pointer; }
 button:focus-visible, a:focus-visible, input:focus-visible { outline: 2px solid #fff; outline-offset: 3px; }
 .actions { display: flex; gap: .75rem; align-items: center; margin: 1rem 0; }
-.file { border-top: 1px solid #393939; padding: 1rem 0; overflow-wrap: anywhere; }
-.preview { display: block; max-width: 100%; max-height: 65vh; object-fit: contain; margin-top: 1rem; border-radius: .5rem; }
+.gallery { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 12rem), 1fr)); gap: .75rem; margin-top: 1rem; }
+.file { min-width: 0; overflow: hidden; border: 1px solid #393939; border-radius: .75rem; background: #080808; }
+.file summary { display: block; cursor: pointer; list-style: none; }
+.file summary::-webkit-details-marker { display: none; }
+.file summary:focus-visible { outline: 2px solid #fff; outline-offset: -2px; }
+.preview { display: block; width: 100%; aspect-ratio: 4 / 3; object-fit: cover; background: #161616; }
+.file-placeholder { display: grid; width: 100%; aspect-ratio: 4 / 3; place-items: center;
+    background: #161616; color: #aaa; font-size: 2rem; }
+.file-info { padding: .75rem; overflow-wrap: anywhere; }
+.file-info p { margin: .25rem 0; }
 .muted { color: #aaa; }
 `
 
@@ -134,10 +142,11 @@ form.addEventListener('submit', async event => {
 
 export async function getGalleryPage(_req: FastifyRequest, res: FastifyReply) {
     const body = `<p>Your uploaded files and share links.</p>
-<section id="files" aria-live="polite" class="muted">Loading…</section>
+<section id="files" aria-live="polite" class="gallery">Loading…</section>
 ${authScript}
 <script>
 const root = document.querySelector('#files')
+let previewCount = 0
 window.cdnAuth.then(auth => auth && fetch(
     '/api/files/user/' + encodeURIComponent(auth.id),
     { cache: 'no-store', credentials: 'same-origin' },
@@ -153,24 +162,41 @@ window.cdnAuth.then(auth => auth && fetch(
         root.textContent = ''
         if (!files.length) { root.textContent = 'No files yet.'; return }
         for (const file of files) {
-            const row = document.createElement('article')
-            const link = document.createElement('a')
+            const details = document.createElement('details')
+            const summary = document.createElement('summary')
+            const info = document.createElement('div')
+            const name = document.createElement('p')
             const meta = document.createElement('p')
-            row.className = 'file'
-            link.href = fileUrl(file.id)
-            link.textContent = file.name
-            meta.className = 'muted'
-            meta.textContent = file.type + ' · ' + new Date(file.uploaded_at).toLocaleString()
-            row.append(link, meta)
-            if (/^image[/](jpeg|png|gif|webp|avif)$/i.test(file.type)) {
+            const link = document.createElement('a')
+            details.className = 'file'
+            const url = fileUrl(file.id)
+            const isImage = /^image[/](jpeg|png|gif|webp|avif)$/i.test(file.type)
+            if (isImage) {
                 const preview = document.createElement('img')
                 preview.className = 'preview'
-                preview.src = link.href
+                preview.src = url
                 preview.alt = file.name
-                preview.loading = 'lazy'
-                row.append(preview)
+                preview.decoding = 'async'
+                preview.loading = previewCount === 0 ? 'eager' : 'lazy'
+                previewCount++
+                summary.append(preview)
+            } else {
+                const placeholder = document.createElement('span')
+                placeholder.className = 'file-placeholder'
+                placeholder.setAttribute('aria-hidden', 'true')
+                placeholder.textContent = '▤'
+                summary.append(placeholder)
             }
-            root.append(row)
+            name.textContent = file.name
+            meta.className = 'muted'
+            meta.textContent = file.type + ' · ' + new Date(file.uploaded_at).toLocaleString()
+            link.href = url
+            link.textContent = 'Open original'
+            link.setAttribute('aria-label', 'Open ' + file.name)
+            info.className = 'file-info'
+            info.append(name, meta, link)
+            details.append(summary, info)
+            root.append(details)
         }
     })
     .catch(error => { root.textContent = error.message || 'Your library could not be loaded.' })
