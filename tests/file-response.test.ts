@@ -1,15 +1,18 @@
 import { describe, expect, test } from 'bun:test'
 import { getGalleryPage, getLoginPage, getUploadPage } from '../src/handlers/index/staticPages.ts'
+import redirectLegacyFile from '../src/handlers/files/redirectLegacy.ts'
 import { fileResponseHeaders } from '../src/utils/fileResponse.ts'
 
 async function page(handler: typeof getUploadPage) {
     let html = ''
+    const headers: Record<string, string> = {}
     const reply = {
+        header: (name: string, value: string) => { headers[name] = value; return reply },
         type: () => reply,
         send: (body: string) => { html = body; return body },
     }
     await handler({} as never, reply as never)
-    return html
+    return { html, headers }
 }
 
 describe('file response safety', () => {
@@ -33,18 +36,42 @@ describe('file response safety', () => {
     })
 })
 
+describe('legacy file links', () => {
+    test('redirects the old path to the canonical API URL without caching', async () => {
+        let redirect: { url: string, statusCode: number } | undefined
+        let cacheControl = ''
+        const reply = {
+            header: (_name: string, value: string) => { cacheControl = value; return reply },
+            redirect: (url: string, statusCode: number) => { redirect = { url, statusCode }; return reply },
+        }
+        await redirectLegacyFile({ params: { id: 'file id' } } as never, reply as never)
+        expect(redirect).toEqual({ url: '/api/files/file%20id', statusCode: 308 })
+        expect(cacheControl).toBe('no-store')
+    })
+})
+
 describe('standalone CDN pages', () => {
     test('upload and gallery call the local service and require a session', async () => {
-        const upload = await page(getUploadPage)
-        const gallery = await page(getGalleryPage)
-        const login = await page(getLoginPage)
+        const uploadPage = await page(getUploadPage)
+        const galleryPage = await page(getGalleryPage)
+        const loginPage = await page(getLoginPage)
+        const { html: upload, headers: uploadHeaders } = uploadPage
+        const { html: gallery, headers: galleryHeaders } = galleryPage
+        const { html: login, headers: loginHeaders } = loginPage
 
         expect(upload).toContain('fetch(\'/api/files\'')
         expect(gallery).toContain('fetch(\'/api/files/user/\'')
+        expect(upload).toContain("const fileUrl = id => '/api/files/' + encodeURIComponent(id)")
+        expect(gallery).toContain("const fileUrl = id => '/api/files/' + encodeURIComponent(id)")
+        expect(upload).not.toContain("link.href = '/files/'")
+        expect(gallery).not.toContain("link.href = '/files/'")
         expect(upload).toContain('location.replace(\'/login?returnTo=\'')
         expect(upload).not.toContain('https://hanasand.com/upload')
         expect(gallery).not.toContain('https://hanasand.com/gallery')
         expect(login).toContain('fetch(\'/api/auth/login\'')
         expect(login).not.toContain('hanasand.com/login')
+        expect(uploadHeaders['Cache-Control']).toBe('private, no-store')
+        expect(galleryHeaders['Cache-Control']).toBe('private, no-store')
+        expect(loginHeaders['Cache-Control']).toBe('private, no-store')
     })
 })

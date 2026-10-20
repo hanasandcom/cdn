@@ -38,6 +38,7 @@ ${body}
 
 const authScript = `<script>
 const login = () => location.replace('/login?returnTo=' + encodeURIComponent(location.pathname))
+const fileUrl = id => '/api/files/' + encodeURIComponent(id)
 window.cdnAuth = (async () => {
     const response = await fetch('/api/auth/session', { cache: 'no-store', credentials: 'same-origin' })
     if (response.status === 401) { login(); return null }
@@ -73,7 +74,7 @@ document.querySelector('#upload').addEventListener('submit', async event => {
         if (!response.ok) throw Error(result.error || 'Upload failed.')
         status.textContent = 'Uploaded: '
         const link = document.createElement('a')
-        link.href = '/files/' + encodeURIComponent(result.id)
+        link.href = fileUrl(result.id)
         link.textContent = location.origin + link.pathname
         status.append(link)
         if (/^image\/(jpeg|png|gif|webp|avif)$/i.test(file.type)) {
@@ -88,7 +89,7 @@ document.querySelector('#upload').addEventListener('submit', async event => {
     }
 })
 </script>`
-    return res.type('text/html').send(shell('Upload media', body))
+    return res.header('Cache-Control', 'private, no-store').type('text/html').send(shell('Upload media', body))
 }
 
 export async function getLoginPage(_req: FastifyRequest, res: FastifyReply) {
@@ -128,7 +129,7 @@ form.addEventListener('submit', async event => {
     }
 })
 </script>`
-    return res.type('text/html').send(shell('Sign in', body))
+    return res.header('Cache-Control', 'private, no-store').type('text/html').send(shell('Sign in', body))
 }
 
 export async function getGalleryPage(_req: FastifyRequest, res: FastifyReply) {
@@ -153,7 +154,7 @@ window.cdnAuth.then(auth => auth && fetch('/api/files/user/' + encodeURIComponen
             const link = document.createElement('a')
             const meta = document.createElement('p')
             row.className = 'file'
-            link.href = '/files/' + encodeURIComponent(file.id)
+            link.href = fileUrl(file.id)
             link.textContent = file.name
             meta.className = 'muted'
             meta.textContent = file.type + ' · ' + new Date(file.uploaded_at).toLocaleString()
@@ -171,5 +172,5 @@ window.cdnAuth.then(auth => auth && fetch('/api/files/user/' + encodeURIComponen
     })
     .catch(error => { root.textContent = error.message || 'Your library could not be loaded.' })
 </script>`
-    return res.type('text/html').send(shell('Your files', body))
+    return res.header('Cache-Control', 'private, no-store').type('text/html').send(shell('Your files', body))
 }
