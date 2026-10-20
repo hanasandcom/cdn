@@ -60,11 +60,11 @@ describe('standalone CDN pages', () => {
         const { html: login, headers: loginHeaders } = loginPage
 
         expect(upload).toContain('fetch(\'/api/files\'')
-        expect(gallery).toContain('fetch(\'/api/files/user/\'')
-        expect(upload).toContain("const fileUrl = id => '/api/files/' + encodeURIComponent(id)")
-        expect(gallery).toContain("const fileUrl = id => '/api/files/' + encodeURIComponent(id)")
-        expect(upload).not.toContain("link.href = '/files/'")
-        expect(gallery).not.toContain("link.href = '/files/'")
+        expect(gallery).toContain('\'/api/files/user/\' + encodeURIComponent(auth.id)')
+        expect(upload).toContain('const fileUrl = id => \'/api/files/\' + encodeURIComponent(id)')
+        expect(gallery).toContain('const fileUrl = id => \'/api/files/\' + encodeURIComponent(id)')
+        expect(upload).not.toContain('link.href = \'/files/\'')
+        expect(gallery).not.toContain('link.href = \'/files/\'')
         expect(upload).toContain('location.replace(\'/login?returnTo=\'')
         expect(upload).not.toContain('https://hanasand.com/upload')
         expect(gallery).not.toContain('https://hanasand.com/gallery')

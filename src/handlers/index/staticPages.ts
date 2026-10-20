@@ -77,7 +77,7 @@ document.querySelector('#upload').addEventListener('submit', async event => {
         link.href = fileUrl(result.id)
         link.textContent = location.origin + link.pathname
         status.append(link)
-        if (/^image\/(jpeg|png|gif|webp|avif)$/i.test(file.type)) {
+        if (/^image[/](jpeg|png|gif|webp|avif)$/i.test(file.type)) {
             const preview = document.createElement('img')
             preview.className = 'preview'
             preview.src = link.pathname
@@ -138,7 +138,10 @@ export async function getGalleryPage(_req: FastifyRequest, res: FastifyReply) {
 ${authScript}
 <script>
 const root = document.querySelector('#files')
-window.cdnAuth.then(auth => auth && fetch('/api/files/user/' + encodeURIComponent(auth.id), { cache: 'no-store', credentials: 'same-origin' }))
+window.cdnAuth.then(auth => auth && fetch(
+    '/api/files/user/' + encodeURIComponent(auth.id),
+    { cache: 'no-store', credentials: 'same-origin' },
+))
     .then(async response => {
         if (!response) return null
         if (response.status === 401) return login()
@@ -159,7 +162,7 @@ window.cdnAuth.then(auth => auth && fetch('/api/files/user/' + encodeURIComponen
             meta.className = 'muted'
             meta.textContent = file.type + ' · ' + new Date(file.uploaded_at).toLocaleString()
             row.append(link, meta)
-            if (/^image\/(jpeg|png|gif|webp|avif)$/i.test(file.type)) {
+            if (/^image[/](jpeg|png|gif|webp|avif)$/i.test(file.type)) {
                 const preview = document.createElement('img')
                 preview.className = 'preview'
                 preview.src = link.href
