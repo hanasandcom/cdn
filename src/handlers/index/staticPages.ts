@@ -11,6 +11,7 @@ h1 { font-size: 2rem; margin: .5rem 0; }
 p { color: #aaa; line-height: 1.5; }
 input, button { font: inherit; border-radius: .6rem; padding: .75rem; }
 input { width: 100%; background: #080808; color: #fff; border: 1px solid #393939; }
+form { display: grid; gap: .5rem; }
 button { border: 0; background: #f6f6f3; color: #111; font-weight: 600; cursor: pointer; }
 button:focus-visible, a:focus-visible, input:focus-visible { outline: 2px solid #fff; outline-offset: 3px; }
 .actions { display: flex; gap: .75rem; align-items: center; margin: 1rem 0; }
@@ -40,7 +41,7 @@ const cookies = Object.fromEntries(document.cookie.split(';').map(part => {
     return [decodeURIComponent(key), decodeURIComponent(value.join('='))]
 }))
 const auth = { id: cookies.id || '', Authorization: 'Bearer ' + (cookies.access_token || '') }
-const login = () => location.replace('https://hanasand.com/login?path=' + encodeURIComponent(location.pathname))
+const login = () => location.replace('/login?returnTo=' + encodeURIComponent(location.pathname))
 if (!auth.id || auth.Authorization === 'Bearer ') login()
 </script>`
 
@@ -79,6 +80,46 @@ document.querySelector('#upload').addEventListener('submit', async event => {
 })
 </script>`
     return res.type('text/html').send(shell('Upload media', body))
+}
+
+export async function getLoginPage(_req: FastifyRequest, res: FastifyReply) {
+    const body = `<p>Sign in to your Hanasand account to upload files and view your library.</p>
+<form id="login" class="login-form">
+<label for="username">Username</label>
+<input id="username" name="username" autocomplete="username" required>
+<label for="password">Password</label>
+<input id="password" name="password" type="password" autocomplete="current-password" required>
+<div class="actions"><button id="submit">Sign in</button></div>
+</form>
+<p id="status" role="status" aria-live="polite"></p>
+<script>
+const form = document.querySelector('#login')
+const status = document.querySelector('#status')
+form.addEventListener('submit', async event => {
+    event.preventDefault()
+    const button = document.querySelector('#submit')
+    button.disabled = true
+    status.textContent = 'Signing in…'
+    try {
+        const response = await fetch('/api/auth/login', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                username: form.elements.username.value,
+                password: form.elements.password.value,
+            }),
+        })
+        const result = await response.json()
+        if (!response.ok) throw Error(result.error || 'Sign-in failed.')
+        const target = new URLSearchParams(location.search).get('returnTo') || '/gallery'
+        location.replace(target.startsWith('/') && !target.startsWith('//') ? target : '/gallery')
+    } catch (error) {
+        status.textContent = error.message || 'Sign-in failed. Please try again.'
+        button.disabled = false
+    }
+})
+</script>`
+    return res.type('text/html').send(shell('Sign in', body))
 }
 
 export async function getGalleryPage(_req: FastifyRequest, res: FastifyReply) {

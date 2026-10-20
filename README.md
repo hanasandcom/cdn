@@ -1,10 +1,10 @@
 # Hanasand CDN
 
-Standalone file storage and sharing service for Hanasand. The CDN host serves its own upload and gallery pages at `/upload` and `/gallery`; those pages call this service's API directly. Sign-in uses the shared Hanasand account session.
+Standalone file storage and sharing service for Hanasand. The CDN host serves its own sign-in, upload, and gallery pages. Sign-in and session validation use the Identity API directly; uploads and library requests use this service's API, without depending on the Hanasand website or Hanasand API.
 
 ## Run with Docker Compose
 
-Install Docker Compose v2 and create a local `.env` file with `DB_PASSWORD` set. The Compose project is named `cdn`, with its own PostgreSQL database and persistent file volume. The service also joins the external Identity network so the API can validate account tokens; create that network before starting the stack.
+Install Docker Compose v2 and create a local `.env` file with `DB_PASSWORD` set. The Compose project is named `cdn`, with its own PostgreSQL database and persistent file volume. The service also joins the external Identity network so it can create and validate account sessions; create that network before starting the stack. `CDN_AUTH_API_URL` defaults to `http://identity:8081/api`.
 
 From this directory:
 

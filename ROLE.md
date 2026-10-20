@@ -12,13 +12,13 @@
 
 | Fact | Source and rationale | Checked at | Refresh trigger |
 | --- | --- | --- | --- |
-| Local checkout is `/Users/eirikhanasand/Desktop/personal/cdn`, on `main`, clean, at `715ef36` (`Decouple CDN auth and database pool`), tracking `origin/main`. | `git status --short --branch`, `git remote -v`, and `git log -1`; direct local check. | 2026-10-19 | Before each task that depends on working-tree state or current revision. |
-| GitHub remote is `git@github.com:hanasandcom/cdn.git`; the `hanasand` remote points to `ssh://git@git.hanasand.com/eirikhanasand/cdn.git`. | `git remote -v`; direct local check. | 2026-10-19 | Before remote operations or when remotes change. |
+| Local checkout is `/Users/eirikhanasand/Desktop/personal/cdn`, on `main`; refresh the current commit and dirty state before each task. | `git status --short --branch`, `git remote -v`, and `git log -1`; direct local check. | 2026-10-20 | Before each task that depends on working-tree state or current revision. |
+| GitHub remote is `git@github.com:hanasandcom/cdn.git`; Forgejo `hanasand` remote is `ssh://git@git.hanasand.com/hanasandcom/cdn.git`. | `git remote -v` and `git ls-remote hanasand refs/heads/main`; direct check, user confirmed namespace. | 2026-10-20 | Before remote operations or when remotes change. |
 | The README documents a separate CDN Compose deployment, Identity proxy authentication, file storage in `cdn_data`, and database plus volume backup requirements. | `README.md`; direct local check. | 2026-10-19 | Before deployment, storage, auth, or backup work. |
 | Package scripts include `start`, `lint` (runs ESLint with `--fix`), `test:e2e`, `test:e2e:traffic`, and `audit:api`. | `package.json`; direct local check. | 2026-10-19 | Before choosing verification; recheck if package scripts change. |
 
 ## Current continuity
 
-- No implementation task or handoff is active. On a specific request, establish its scope, inspect current repository state, complete authorized work, and report evidence and limits.
+- The 2026-10-20 upload/CDN standalone work is committed locally; confirm pushes to both remotes and complete staging before production deployment. The user explicitly requested deployment for this task.
 - Deployment or other operational actions require task-specific authorization; the README describes effects but does not authorize them.
 - No current CI status, production state, reviewer/integrator policy, or branch protection settings were checked. Verify them when relevant.

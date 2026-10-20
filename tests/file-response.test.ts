@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test'
-import { getGalleryPage, getUploadPage } from '../src/handlers/index/staticPages.ts'
+import { getGalleryPage, getLoginPage, getUploadPage } from '../src/handlers/index/staticPages.ts'
 import { fileResponseHeaders } from '../src/utils/fileResponse.ts'
 
 async function page(handler: typeof getUploadPage) {
@@ -37,11 +37,14 @@ describe('standalone CDN pages', () => {
     test('upload and gallery call the local service and require a session', async () => {
         const upload = await page(getUploadPage)
         const gallery = await page(getGalleryPage)
+        const login = await page(getLoginPage)
 
         expect(upload).toContain('fetch(\'/api/files\'')
         expect(gallery).toContain('fetch(\'/api/files/user/\'')
-        expect(upload).toContain('https://hanasand.com/login?path=')
+        expect(upload).toContain('location.replace(\'/login?returnTo=\'')
         expect(upload).not.toContain('https://hanasand.com/upload')
         expect(gallery).not.toContain('https://hanasand.com/gallery')
+        expect(login).toContain('fetch(\'/api/auth/login\'')
+        expect(login).not.toContain('hanasand.com/login')
     })
 })

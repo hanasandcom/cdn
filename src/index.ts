@@ -4,7 +4,8 @@ import routes from './routes.ts'
 import health from './handlers/index/health.ts'
 import { prepareStorage } from '#utils/fileStorage.ts'
 import getIndex from './handlers/index/get.ts'
-import { getGalleryPage, getUploadPage } from './handlers/index/staticPages.ts'
+import { getGalleryPage, getLoginPage, getUploadPage } from './handlers/index/staticPages.ts'
+import login from './handlers/auth/login.ts'
 import getRobotsTxt from './handlers/index/getRobotsTxt.ts'
 import websocketPlugin from '@fastify/websocket'
 import fastifyMultipart from '@fastify/multipart'
@@ -62,6 +63,8 @@ fastify.register(routes, { prefix: '/api' })
 fastify.get('/', getIndex)
 fastify.get('/upload', getUploadPage)
 fastify.get('/gallery', getGalleryPage)
+fastify.get('/login', getLoginPage)
+fastify.post('/api/auth/login', login)
 fastify.get('/health', health)
 fastify.get('/robots.txt', getRobotsTxt)
 
