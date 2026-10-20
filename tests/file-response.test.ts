@@ -51,7 +51,7 @@ describe('legacy file links', () => {
 })
 
 describe('standalone CDN pages', () => {
-    test('upload and gallery call the local service and require a session', async () => {
+    test('upload supports guests while the gallery requires a session', async () => {
         const uploadPage = await page(getUploadPage)
         const galleryPage = await page(getGalleryPage)
         const loginPage = await page(getLoginPage)
@@ -63,6 +63,9 @@ describe('standalone CDN pages', () => {
         expect(upload).toContain('type="file" multiple required')
         expect(upload).toContain('fetch(\'/api/files/bulk\'')
         expect(upload).toContain('X-CDN-Upload-Count')
+        expect(upload).toContain('if (response.status === 401) return null')
+        expect(upload).toContain('if (!auth) {')
+        expect(upload).toContain('await wait(1000)')
         expect(gallery).toContain('\'/api/files/user/\' + encodeURIComponent(auth.id)')
         expect(upload).toContain('const fileUrl = id => \'/api/files/\' + encodeURIComponent(id)')
         expect(gallery).toContain('const fileUrl = id => \'/api/files/\' + encodeURIComponent(id)')
@@ -76,7 +79,7 @@ describe('standalone CDN pages', () => {
         expect(gallery).toContain('?limit=100&offset=')
         expect(gallery).toContain('Load more')
         expect(gallery).not.toContain('link.textContent = file.name')
-        expect(upload).toContain('location.replace(\'/login?returnTo=\'')
+        expect(gallery).toContain('location.replace(\'/login?returnTo=\'')
         expect(upload).not.toContain('https://hanasand.com/upload')
         expect(gallery).not.toContain('https://hanasand.com/gallery')
         expect(login).toContain('fetch(\'/api/auth/login\'')

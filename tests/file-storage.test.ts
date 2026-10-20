@@ -49,9 +49,20 @@ function bulkUpload(files: { name: string, body: string }[], auth = true) {
         },
     })
 }
-test('anonymous upload is rejected before data is stored', async () => {
-    expect((await upload('anonymous', 'anonymous', false)).statusCode).toBe(401)
-    expect((await pool.query('SELECT count(*) FROM files')).rows[0].count).toBe('0')
+test('guests can upload one public file per second from one IP', async () => {
+    const response = await upload('guest file', 'guest-path-is-ignored', false)
+    expect(response.statusCode).toBe(200)
+    const { id, owner } = response.json()
+    expect(owner).toBeNull()
+    const row = (await pool.query('SELECT * FROM files WHERE id=$1', [id])).rows[0]
+    expect(row.owner).toMatch(/^guest:[a-f0-9]{64}$/)
+    expect(row.path).toBe(id)
+    expect((await app.inject('/files/' + id)).body).toBe('guest file')
+
+    const limited = await upload('another guest file', 'another-guest-path', false)
+    expect(limited.statusCode).toBe(429)
+    expect(limited.headers['retry-after']).toBe('1')
+    expect((await pool.query('SELECT count(*) FROM files')).rows[0].count).toBe('1')
 })
 test('upload uses disk, round trips bytes, preserves legacy reads and isolates library ownership', async () => {
     const response = await upload('hello CDN', 'roundtrip')

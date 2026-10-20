@@ -1,7 +1,11 @@
+import { createHmac } from 'node:crypto'
+import { isIP } from 'node:net'
+import config from '#constants'
 import { StorageError } from './fileStorage.ts'
 
 const normalUploadTimes = new Map<string, number>()
 const bulkBuckets = new Map<string, { tokens: number, updatedAt: number }>()
+const activeGuestUploads = new Set<string>()
 const maxBulkFilesPerSecond = 5000
 const bulkRefillPerMs = maxBulkFilesPerSecond / 1000
 let active = 0
@@ -65,5 +69,29 @@ export function beginUpload(owner: string, options: UploadOptions = {}) {
         if (finished) return
         active--
         finished = true
+    }
+}
+
+/** Reserve one guest upload using the address supplied by Fastify's trusted proxy chain. */
+export function beginGuestUpload(clientIp: string, now = Date.now()) {
+    if (!clientIp || isIP(clientIp) === 0) throw new StorageError(400, 'A valid client IP is required for guest uploads.')
+
+    const address = clientIp.toLowerCase()
+    const owner = `guest:${createHmac('sha256', config.DB_PASSWORD || '').update(address).digest('hex')}`
+    if (activeGuestUploads.has(owner)) {
+        throw new StorageError(429, 'A guest upload from this IP is already in progress.')
+    }
+
+    const finishUpload = beginUpload(owner, { now })
+    activeGuestUploads.add(owner)
+    let finished = false
+    return {
+        owner,
+        finish: () => {
+            if (finished) return
+            activeGuestUploads.delete(owner)
+            finishUpload()
+            finished = true
+        },
     }
 }

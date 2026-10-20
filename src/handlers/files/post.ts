@@ -2,7 +2,7 @@ import type { FastifyReply, FastifyRequest } from 'fastify'
 import { randomUUID } from 'node:crypto'
 import tokenWrapper from '#utils/auth/tokenWrapper.ts'
 import { persistFile, maxFileBytes, StorageError } from '#utils/fileStorage.ts'
-import { beginUpload } from '#utils/uploadGuard.ts'
+import { beginGuestUpload, beginUpload } from '#utils/uploadGuard.ts'
 import { getSessionUserId } from '#utils/auth/session.ts'
 
 export default async function postFile(req: FastifyRequest, res: FastifyReply) {
@@ -11,11 +11,16 @@ export default async function postFile(req: FastifyRequest, res: FastifyReply) {
     const userId = user && token
         ? (await tokenWrapper(user, token)).id
         : await getSessionUserId(req)
-    if (!userId) return res.status(401).send({ error: 'Sign in to upload files.' })
     if (!req.isMultipart()) return res.status(400).send({ error: 'Request is not multipart' })
     let finish: (() => void) | undefined
+    let owner = userId || ''
     try {
-        finish = beginUpload(userId)
+        if (userId) finish = beginUpload(userId)
+        else {
+            const guestUpload = beginGuestUpload(req.ip)
+            owner = guestUpload.owner
+            finish = guestUpload.finish
+        }
         const fields: Record<string, string> = {}
         let data: Buffer | undefined
         for await (const part of req.parts({ limits: { fileSize: maxFileBytes, files: 1, fields: 4, parts: 5 } })) {
@@ -33,13 +38,13 @@ export default async function postFile(req: FastifyRequest, res: FastifyReply) {
             return res.status(400).send({ error: 'Invalid file type.' })
         }
         const id = randomUUID()
-        const path = fields.path || id
-        await persistFile(userId, data, async (client, key) => {
+        const path = userId ? fields.path || id : id
+        await persistFile(owner, data, async (client, key) => {
             await client.query(`INSERT INTO files (id,name,description,data,path,type,owner,storage_key,storage_size)
                 VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)`,
-            [id, fields.name, fields.description || null, Buffer.alloc(0), path, type, userId, key, data!.length])
+            [id, fields.name, fields.description || null, Buffer.alloc(0), path, type, owner, key, data!.length])
         })
-        return res.send({ id, path, owner: userId })
+        return res.send({ id, path, owner: userId || null })
     } catch (error) {
         const e = error as Error & { statusCode?: number, code?: string }
         if (e.code === '23505') return res.status(409).send({ error: 'That file path is already taken.' })

@@ -55,6 +55,17 @@ window.cdnAuth = (async () => {
 })()
 </script>`
 
+const uploadAuthScript = `<script>
+const login = () => location.replace('/login?returnTo=' + encodeURIComponent(location.pathname))
+const fileUrl = id => '/api/files/' + encodeURIComponent(id)
+window.cdnAuth = (async () => {
+    const response = await fetch('/api/auth/session', { cache: 'no-store', credentials: 'same-origin' })
+    if (response.status === 401) return null
+    if (!response.ok) throw Error('Your session could not be checked. Reload to try again.')
+    return response.json()
+})()
+</script>`
+
 export async function getUploadPage(_req: FastifyRequest, res: FastifyReply) {
     const body = `<p>Upload images, videos or files.</p>
 <form id="upload">
@@ -62,7 +73,7 @@ export async function getUploadPage(_req: FastifyRequest, res: FastifyReply) {
 <div class="actions"><input id="file" name="file" type="file" multiple required><button>Upload</button></div>
 </form>
 <p id="status" role="status"></p>
-${authScript}
+${uploadAuthScript}
 <script>
 const form = document.querySelector('#upload')
 const fileInput = document.querySelector('#file')
@@ -82,7 +93,46 @@ form.addEventListener('submit', async event => {
     button.disabled = true
     status.textContent = 'Preparing upload…'
     try {
-        if (!await window.cdnAuth) return
+        const auth = await window.cdnAuth
+        if (!auth) {
+            const links = []
+            for (let i = 0; i < files.length; i++) {
+                const file = files[i]
+                status.textContent = 'Uploading ' + (i + 1) + ' of ' + files.length + ' files…'
+                const data = new FormData()
+                data.set('file', file)
+                data.set('name', file.name)
+                data.set('type', file.type || 'application/octet-stream')
+                while (true) {
+                    const response = await fetch('/api/files', { method: 'POST', body: data, credentials: 'same-origin' })
+                    if (response.status === 429) {
+                        const delay = Math.max(1, Number(response.headers.get('Retry-After')) || 1)
+                        await wait(delay * 1000)
+                        continue
+                    }
+                    const result = await response.json()
+                    if (!response.ok) throw Error(result.error || 'Upload failed.')
+                    const url = fileUrl(result.id)
+                    links.push({ url, name: file.name, type: file.type })
+                    break
+                }
+                if (i < files.length - 1) await wait(1000)
+            }
+            status.replaceChildren()
+            for (const item of links) {
+                const row = document.createElement('p')
+                addLink(row, item.url, item.name + ' · ' + location.origin + item.url)
+                if (/^image[/](jpeg|png|gif|webp|avif)$/i.test(item.type)) {
+                    const preview = document.createElement('img')
+                    preview.className = 'preview'
+                    preview.src = item.url
+                    preview.alt = item.name
+                    row.append(preview)
+                }
+                status.append(row)
+            }
+            return
+        }
         if (files.length === 1) {
             const file = files[0]
             const data = new FormData()
