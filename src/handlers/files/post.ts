@@ -43,6 +43,9 @@ export default async function postFile(req: FastifyRequest, res: FastifyReply) {
     } catch (error) {
         const e = error as Error & { statusCode?: number, code?: string }
         if (e.code === '23505') return res.status(409).send({ error: 'That file path is already taken.' })
+        if (error instanceof StorageError && error.statusCode === 429) {
+            return res.header('Retry-After', '1').status(error.statusCode).send({ error: error.message })
+        }
         if (error instanceof StorageError || e.statusCode === 413) return res.status(e.statusCode || 413).send({ error: e.message })
         req.log.error({ error }, 'Upload failed')
         return res.status(500).send({ error: 'Upload failed.' })

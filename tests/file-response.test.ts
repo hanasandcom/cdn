@@ -60,6 +60,9 @@ describe('standalone CDN pages', () => {
         const { html: login, headers: loginHeaders } = loginPage
 
         expect(upload).toContain('fetch(\'/api/files\'')
+        expect(upload).toContain('type="file" multiple required')
+        expect(upload).toContain('fetch(\'/api/files/bulk\'')
+        expect(upload).toContain('X-CDN-Upload-Count')
         expect(gallery).toContain('\'/api/files/user/\' + encodeURIComponent(auth.id)')
         expect(upload).toContain('const fileUrl = id => \'/api/files/\' + encodeURIComponent(id)')
         expect(gallery).toContain('const fileUrl = id => \'/api/files/\' + encodeURIComponent(id)')
@@ -70,6 +73,8 @@ describe('standalone CDN pages', () => {
         expect(gallery).toContain('summary.append(preview)')
         expect(gallery).toContain('details.append(summary, info)')
         expect(gallery).toContain('info.append(name, meta, link)')
+        expect(gallery).toContain('?limit=100&offset=')
+        expect(gallery).toContain('Load more')
         expect(gallery).not.toContain('link.textContent = file.name')
         expect(upload).toContain('location.replace(\'/login?returnTo=\'')
         expect(upload).not.toContain('https://hanasand.com/upload')

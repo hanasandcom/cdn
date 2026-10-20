@@ -58,42 +58,139 @@ window.cdnAuth = (async () => {
 export async function getUploadPage(_req: FastifyRequest, res: FastifyReply) {
     const body = `<p>Upload images, videos or files.</p>
 <form id="upload">
-<label for="file">Choose a file</label>
-<div class="actions"><input id="file" name="file" type="file" required><button>Upload</button></div>
+<label for="file">Choose files</label>
+<div class="actions"><input id="file" name="file" type="file" multiple required><button>Upload</button></div>
 </form>
 <p id="status" role="status"></p>
 ${authScript}
 <script>
-document.querySelector('#upload').addEventListener('submit', async event => {
+const form = document.querySelector('#upload')
+const fileInput = document.querySelector('#file')
+const status = document.querySelector('#status')
+const button = form.querySelector('button')
+const wait = ms => new Promise(resolve => setTimeout(resolve, ms))
+const addLink = (parent, url, text) => {
+    const link = document.createElement('a')
+    link.href = url
+    link.textContent = text
+    parent.append(link)
+}
+form.addEventListener('submit', async event => {
     event.preventDefault()
-    const file = document.querySelector('#file').files[0]
-    const status = document.querySelector('#status')
-    if (!file) return
-    status.textContent = 'Uploading…'
-    const data = new FormData()
-    data.set('file', file)
-    data.set('name', file.name)
-    data.set('type', file.type || 'application/octet-stream')
+    const files = Array.from(fileInput.files)
+    if (!files.length) return
+    button.disabled = true
+    status.textContent = 'Preparing upload…'
     try {
         if (!await window.cdnAuth) return
-        const response = await fetch('/api/files', { method: 'POST', body: data, credentials: 'same-origin' })
-        if (response.status === 401) return login()
-        const result = await response.json()
-        if (!response.ok) throw Error(result.error || 'Upload failed.')
-        status.textContent = 'Uploaded: '
-        const link = document.createElement('a')
-        link.href = fileUrl(result.id)
-        link.textContent = location.origin + link.pathname
-        status.append(link)
-        if (/^image[/](jpeg|png|gif|webp|avif)$/i.test(file.type)) {
-            const preview = document.createElement('img')
-            preview.className = 'preview'
-            preview.src = link.pathname
-            preview.alt = file.name
-            status.append(preview)
+        if (files.length === 1) {
+            const file = files[0]
+            const data = new FormData()
+            data.set('file', file)
+            data.set('name', file.name)
+            data.set('type', file.type || 'application/octet-stream')
+            const response = await fetch('/api/files', { method: 'POST', body: data, credentials: 'same-origin' })
+            if (response.status === 401) return login()
+            const result = await response.json()
+            if (!response.ok) throw Error(result.error || 'Upload failed.')
+            status.textContent = 'Uploaded: '
+            const url = fileUrl(result.id)
+            addLink(status, url, location.origin + url)
+            if (/^image[/](jpeg|png|gif|webp|avif)$/i.test(file.type)) {
+                const preview = document.createElement('img')
+                preview.className = 'preview'
+                preview.src = url
+                preview.alt = file.name
+                status.append(preview)
+            }
+            return
+        }
+
+        const uploaded = []
+        const failed = []
+        let start = 0
+        while (start < files.length) {
+            let end = start
+            let batchBytes = 0
+            while (end < files.length && end - start < 5000 && batchBytes + files[end].size <= 45 * 1024 * 1024) {
+                batchBytes += files[end].size
+                end++
+            }
+            if (end === start) {
+                const file = files[start]
+                status.textContent = 'Uploading ' + (start + 1) + ' of ' + files.length + ' files…'
+                const data = new FormData()
+                data.set('file', file)
+                data.set('name', file.name)
+                data.set('type', file.type || 'application/octet-stream')
+                while (true) {
+                    const response = await fetch('/api/files', { method: 'POST', body: data, credentials: 'same-origin' })
+                    if (response.status === 401) return login()
+                    if (response.status === 429) {
+                        const delay = Math.max(1, Number(response.headers.get('Retry-After')) || 1)
+                        await wait(delay * 1000)
+                        continue
+                    }
+                    const result = await response.json()
+                    if (!response.ok) throw Error(result.error || 'Upload failed.')
+                    uploaded.push({ id: result.id, name: file.name })
+                    break
+                }
+                start++
+                continue
+            }
+            const batch = files.slice(start, end)
+            let result
+            while (true) {
+                status.textContent = 'Uploading ' + (start + 1) + ' of ' + files.length + ' files…'
+                const data = new FormData()
+                for (const file of batch) data.append('files', file, file.name)
+                const response = await fetch('/api/files/bulk', {
+                    method: 'POST',
+                    headers: { 'X-CDN-Upload-Count': String(batch.length) },
+                    body: data,
+                    credentials: 'same-origin',
+                })
+                if (response.status === 401) return login()
+                if (response.status === 429) {
+                    const delay = Math.max(1, Number(response.headers.get('Retry-After')) || 1)
+                    await wait(delay * 1000)
+                    continue
+                }
+                result = await response.json()
+                if (!response.ok) throw Error(result.error || 'Bulk upload failed.')
+                break
+            }
+            uploaded.push(...result.uploaded)
+            failed.push(...result.failed)
+            start = end
+            status.textContent = 'Uploaded ' + uploaded.length + ' of ' + files.length + ' files…'
+        }
+        status.replaceChildren()
+        const summary = document.createElement('p')
+        summary.textContent = uploaded.length + ' uploaded, ' + failed.length + ' failed.'
+        const gallery = document.createElement('a')
+        gallery.href = '/gallery'
+        gallery.textContent = 'Open gallery'
+        status.append(summary, gallery)
+        if (failed.length) {
+            const list = document.createElement('ul')
+            for (const item of failed.slice(0, 20)) {
+                const row = document.createElement('li')
+                row.textContent = item.name + ': ' + item.error
+                list.append(row)
+            }
+            status.append(list)
+            if (failed.length > 20) {
+                const more = document.createElement('p')
+                more.textContent = 'Showing 20 of ' + failed.length + ' errors.'
+                status.append(more)
+            }
         }
     } catch (error) {
         status.textContent = error.message || 'Upload failed.'
+    } finally {
+        button.disabled = false
     }
 })
 </script>`
@@ -143,62 +240,74 @@ form.addEventListener('submit', async event => {
 export async function getGalleryPage(_req: FastifyRequest, res: FastifyReply) {
     const body = `<p>Your uploaded files and share links.</p>
 <section id="files" aria-live="polite" class="gallery">Loading…</section>
+<button id="load-more" type="button" hidden>Load more</button>
 ${authScript}
 <script>
 const root = document.querySelector('#files')
+const loadMore = document.querySelector('#load-more')
+let offset = 0
 let previewCount = 0
-window.cdnAuth.then(auth => auth && fetch(
-    '/api/files/user/' + encodeURIComponent(auth.id),
-    { cache: 'no-store', credentials: 'same-origin' },
-))
-    .then(async response => {
-        if (!response) return null
+const appendFiles = files => {
+    for (const file of files) {
+        const details = document.createElement('details')
+        const summary = document.createElement('summary')
+        const info = document.createElement('div')
+        const name = document.createElement('p')
+        const meta = document.createElement('p')
+        const link = document.createElement('a')
+        details.className = 'file'
+        const url = fileUrl(file.id)
+        const isImage = /^image[/](jpeg|png|gif|webp|avif)$/i.test(file.type)
+        if (isImage) {
+            const preview = document.createElement('img')
+            preview.className = 'preview'
+            preview.src = url
+            preview.alt = file.name
+            preview.decoding = 'async'
+            preview.loading = previewCount === 0 ? 'eager' : 'lazy'
+            previewCount++
+            summary.append(preview)
+        } else {
+            const placeholder = document.createElement('span')
+            placeholder.className = 'file-placeholder'
+            placeholder.setAttribute('aria-hidden', 'true')
+            placeholder.textContent = '▤'
+            summary.append(placeholder)
+        }
+        name.textContent = file.name
+        meta.className = 'muted'
+        meta.textContent = file.type + ' · ' + new Date(file.uploaded_at).toLocaleString()
+        link.href = url
+        link.textContent = 'Open original'
+        link.setAttribute('aria-label', 'Open ' + file.name)
+        info.className = 'file-info'
+        info.append(name, meta, link)
+        details.append(summary, info)
+        root.append(details)
+    }
+    offset += files.length
+    loadMore.hidden = files.length < 100
+}
+const fetchFiles = async auth => {
+    loadMore.disabled = true
+    try {
+        const response = await fetch(
+            '/api/files/user/' + encodeURIComponent(auth.id) + '?limit=100&offset=' + offset,
+            { cache: 'no-store', credentials: 'same-origin' },
+        )
         if (response.status === 401) return login()
         if (!response.ok) throw Error('Your library could not be loaded.')
-        return response.json()
-    })
-    .then(files => {
-        if (!files) return
-        root.textContent = ''
-        if (!files.length) { root.textContent = 'No files yet.'; return }
-        for (const file of files) {
-            const details = document.createElement('details')
-            const summary = document.createElement('summary')
-            const info = document.createElement('div')
-            const name = document.createElement('p')
-            const meta = document.createElement('p')
-            const link = document.createElement('a')
-            details.className = 'file'
-            const url = fileUrl(file.id)
-            const isImage = /^image[/](jpeg|png|gif|webp|avif)$/i.test(file.type)
-            if (isImage) {
-                const preview = document.createElement('img')
-                preview.className = 'preview'
-                preview.src = url
-                preview.alt = file.name
-                preview.decoding = 'async'
-                preview.loading = previewCount === 0 ? 'eager' : 'lazy'
-                previewCount++
-                summary.append(preview)
-            } else {
-                const placeholder = document.createElement('span')
-                placeholder.className = 'file-placeholder'
-                placeholder.setAttribute('aria-hidden', 'true')
-                placeholder.textContent = '▤'
-                summary.append(placeholder)
-            }
-            name.textContent = file.name
-            meta.className = 'muted'
-            meta.textContent = file.type + ' · ' + new Date(file.uploaded_at).toLocaleString()
-            link.href = url
-            link.textContent = 'Open original'
-            link.setAttribute('aria-label', 'Open ' + file.name)
-            info.className = 'file-info'
-            info.append(name, meta, link)
-            details.append(summary, info)
-            root.append(details)
-        }
-    })
+        const files = await response.json()
+        if (!offset && !files.length) root.textContent = 'No files yet.'
+        else appendFiles(files)
+    } finally {
+        loadMore.disabled = false
+    }
+}
+loadMore.addEventListener('click', () => window.cdnAuth
+    .then(auth => auth && fetchFiles(auth))
+    .catch(error => { loadMore.textContent = error.message || 'Could not load more files.' }))
+window.cdnAuth.then(auth => auth && fetchFiles(auth))
     .catch(error => { root.textContent = error.message || 'Your library could not be loaded.' })
 </script>`
     return res.header('Cache-Control', 'private, no-store').type('text/html').send(shell('Your files', body))

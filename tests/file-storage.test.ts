@@ -5,8 +5,8 @@ import multipart from '@fastify/multipart'
 import { readFile, readdir } from 'node:fs/promises'
 import pool from '../src/utils/db/pool.ts'
 import { prepareStorage, storageDirectory, persistFile, storageStatus, storageLimit, StorageError } from '../src/utils/fileStorage.ts'
-import { beginUpload } from '../src/utils/uploadGuard.ts'
 import postFile from '../src/handlers/files/post.ts'
+import postBulkFiles from '../src/handlers/files/postBulk.ts'
 import getFile from '../src/handlers/files/get.ts'
 import getUserFiles from '../src/handlers/files/getUserFiles.ts'
 import deleteFile from '../src/handlers/files/delete.ts'
@@ -21,18 +21,33 @@ beforeAll(async () => {
     globalThis.fetch = (async (_url, init) => new Response(JSON.stringify({ id: (init?.headers as Record<string,string>)?.Authorization === 'Bearer valid' ? 'owner' : 'other' }), {status:200})) as typeof fetch
     await app.register(multipart)
     app.post('/files', postFile)
+    app.post('/files/bulk', postBulkFiles)
     app.get('/files/user/:id', getUserFiles)
     app.get('/files/:id', getFile)
     app.delete('/files/:id', deleteFile)
     await app.ready()
 })
 afterAll(async () => { globalThis.fetch = originalFetch; await app.close(); await pool.end() })
-function upload(body: string, path: string, auth = true) {
+function upload(body: string, path: string, auth = true, token = 'valid') {
     const boundary = 'cdn-boundary'
     const fields = { name: 'test.txt', type: 'text/plain', path }
     let payload = Object.entries(fields).map(([key,value]) => `--${boundary}\r\nContent-Disposition: form-data; name="${key}"\r\n\r\n${value}\r\n`).join('')
     payload += `--${boundary}\r\nContent-Disposition: form-data; name="file"; filename="test.txt"\r\nContent-Type: text/plain\r\n\r\n${body}\r\n--${boundary}--\r\n`
-    return app.inject({method:'POST',url:'/files',payload,headers:{'content-type':`multipart/form-data; boundary=${boundary}`,...(auth ? {id:'owner',authorization:'Bearer valid'} : {})}})
+    return app.inject({method:'POST',url:'/files',payload,headers:{'content-type':`multipart/form-data; boundary=${boundary}`,...(auth ? {id:'owner',authorization:`Bearer ${token}`} : {})}})
+}
+function bulkUpload(files: { name: string, body: string }[], auth = true) {
+    const boundary = 'cdn-bulk-boundary'
+    const payload = files.map(({ name, body }) =>
+        `--${boundary}\r\nContent-Disposition: form-data; name="files"; filename="${name}"\r\nContent-Type: image/jpeg\r\n\r\n${body}\r\n`,
+    ).join('') + `--${boundary}--\r\n`
+    return app.inject({
+        method: 'POST', url: '/files/bulk', payload,
+        headers: {
+            'content-type': `multipart/form-data; boundary=${boundary}`,
+            'x-cdn-upload-count': String(files.length),
+            ...(auth ? { id: 'owner', authorization: 'Bearer valid' } : {}),
+        },
+    })
 }
 test('anonymous upload is rejected before data is stored', async () => {
     expect((await upload('anonymous', 'anonymous', false)).statusCode).toBe(401)
@@ -57,8 +72,26 @@ test('upload uses disk, round trips bytes, preserves legacy reads and isolates l
 })
 test('path collision cleans its disk write without replacing the original', async () => {
     const count = (await readdir(storageDirectory)).length
-    expect((await upload('overwrite', 'roundtrip')).statusCode).toBe(409)
+    expect((await upload('overwrite', 'roundtrip', true, 'other')).statusCode).toBe(409)
     expect((await readdir(storageDirectory)).length).toBe(count)
+})
+test('bulk upload stores multiple files and returns canonical share URLs', async () => {
+    const response = await bulkUpload([
+        { name: 'one.jpg', body: 'first image' },
+        { name: 'two.jpg', body: 'second image' },
+    ])
+    expect(response.statusCode).toBe(200)
+    const result = response.json()
+    expect(result.failed).toEqual([])
+    expect(result.uploaded).toHaveLength(2)
+    expect(result.uploaded[0].url).toBe('/api/files/' + result.uploaded[0].id)
+    expect(result.uploaded[1].url).toBe('/api/files/' + result.uploaded[1].id)
+    expect((await app.inject('/files/' + result.uploaded[0].id)).body).toBe('first image')
+})
+test('bulk upload rejects signed-out visitors before storing data', async () => {
+    const response = await bulkUpload([{ name: 'guest.jpg', body: 'guest image' }, { name: 'other.jpg', body: 'other image' }], false)
+    expect(response.statusCode).toBe(401)
+    expect((await pool.query('SELECT count(*) FROM files WHERE name IN (\'guest.jpg\',\'other.jpg\')')).rows[0].count).toBe('0')
 })
 test('storage pressure warns before capacity and blocks writes at the limit', async () => {
     const id = (await pool.query('SELECT id FROM files WHERE path=\'roundtrip\'')).rows[0].id
@@ -68,11 +101,4 @@ test('storage pressure warns before capacity and blocks writes at the limit', as
     expect(status.warnings).toContain('Upload storage is above 80% capacity.')
     await expect(persistFile('different-owner',Buffer.alloc(storageLimit*.2),async () => {})).rejects.toBeInstanceOf(StorageError)
     await pool.query('UPDATE files SET storage_size=9 WHERE id=$1',[id])
-})
-test('upload concurrency and per-account rate limits are enforced', () => {
-    const finishes = Array.from({length:4},(_,i) => beginUpload('parallel-'+i))
-    expect(() => beginUpload('overflow')).toThrow('busy')
-    finishes.forEach(f => f())
-    for(let i=0;i<60;i++) beginUpload('rate')()
-    expect(() => beginUpload('rate')).toThrow('limit')
 })

@@ -20,7 +20,7 @@ docker compose down
 
 The CDN API is published on port `8501` and its database on `8502`. Do not expose the database port to untrusted networks. Compose reads optional settings from `.env`; see `docker-compose.yml` for defaults and network names.
 
-Uploads return a public share URL at `https://cdn.hanasand.com/api/files/<file-id>`. Supported image and video types render inline. The gallery uses the shared Hanasand Identity cookies to validate the session server-side, opens as an image grid, and shows file details only after a tile is opened. The legacy `/files/<file-id>` address redirects to the canonical API URL. Gallery, upload, and sign-in pages bypass Varnish caching so released UI changes appear immediately.
+Uploads return public share URLs at `https://cdn.hanasand.com/api/files/<file-id>`. The upload page accepts multiple files and sends batches of up to 5,000 files and 45 MiB to `POST /api/files/bulk` (the `X-CDN-Upload-Count` header must match the multipart file count). The smaller request-size cap leaves room under the CDN host's 50 MiB proxy limit for multipart headers. The gallery loads 100 files at a time so large libraries do not require one enormous response. Supported image and video types render inline. The gallery uses the shared Hanasand Identity cookies to validate the session server-side and shows file details only after a tile is opened. The legacy `/files/<file-id>` address redirects to the canonical API URL. Gallery, upload, and sign-in pages bypass Varnish caching so released UI changes appear immediately.
 
 ## Development
 
@@ -35,7 +35,7 @@ The API listens on port `8081` by default. Run `bun run test:e2e:traffic` agains
 
 ## Upload limits and storage
 
-Authenticated uploads accept files up to 50 MiB, with up to four concurrent uploads and 60 upload attempts per account per hour. The Hanasand upload form currently caps local and remote media at 20 MiB. Default per-account storage is 5 GiB and total storage is 100 GiB. Uploads stop when the volume has less than 10 GiB free. These limits can be changed with `CDN_USER_STORAGE_LIMIT_BYTES`, `CDN_STORAGE_LIMIT_BYTES`, and `CDN_MIN_FREE_BYTES`.
+Uploads require a signed-in account. Standard uploads are limited to one file per second per account. The authenticated bulk endpoint accepts up to 5,000 files and 45 MiB per request and applies a per-account rate of 5,000 files per second; the rate is an admission limit, not a promise that the network, disk, and database can persist 5,000 files in one second. Files larger than 45 MiB are sent through the standard endpoint. Upload requests are limited to four concurrent requests across the service. Each file is limited to 50 MiB. Default per-account storage is 5 GiB and total storage is 100 GiB. Uploads stop when the volume has less than 10 GiB free. These limits can be changed with `CDN_USER_STORAGE_LIMIT_BYTES`, `CDN_STORAGE_LIMIT_BYTES`, and `CDN_MIN_FREE_BYTES`.
 
 New files are stored in the Compose volume mounted at `/var/lib/cdn/files`; PostgreSQL stores ownership and file metadata. Back up both the database and file volume. Existing database-backed files remain readable.
 
