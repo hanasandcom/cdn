@@ -20,6 +20,8 @@ docker compose down
 
 The CDN API is published on port `8501` and its database on `8502`. Do not expose the database port to untrusted networks. Compose reads optional settings from `.env`; see `docker-compose.yml` for defaults and network names.
 
+Uploads return a public share URL at `https://cdn.hanasand.com/files/<file-id>`. Supported image and video types render inline. The gallery uses the shared Hanasand Identity cookies to validate the session server-side, and shows previews for supported images.
+
 ## Development
 
 Use Bun and the dependencies in `package.json`:

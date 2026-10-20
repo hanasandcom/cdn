@@ -16,6 +16,7 @@ button { border: 0; background: #f6f6f3; color: #111; font-weight: 600; cursor: 
 button:focus-visible, a:focus-visible, input:focus-visible { outline: 2px solid #fff; outline-offset: 3px; }
 .actions { display: flex; gap: .75rem; align-items: center; margin: 1rem 0; }
 .file { border-top: 1px solid #393939; padding: 1rem 0; overflow-wrap: anywhere; }
+.preview { display: block; max-width: 100%; max-height: 65vh; object-fit: contain; margin-top: 1rem; border-radius: .5rem; }
 .muted { color: #aaa; }
 `
 
@@ -36,13 +37,13 @@ ${body}
 }
 
 const authScript = `<script>
-const cookies = Object.fromEntries(document.cookie.split(';').map(part => {
-    const [key, ...value] = part.trim().split('=')
-    return [decodeURIComponent(key), decodeURIComponent(value.join('='))]
-}))
-const auth = { id: cookies.id || '', Authorization: 'Bearer ' + (cookies.access_token || '') }
 const login = () => location.replace('/login?returnTo=' + encodeURIComponent(location.pathname))
-if (!auth.id || auth.Authorization === 'Bearer ') login()
+window.cdnAuth = (async () => {
+    const response = await fetch('/api/auth/session', { cache: 'no-store', credentials: 'same-origin' })
+    if (response.status === 401) { login(); return null }
+    if (!response.ok) throw Error('Your session could not be checked. Reload to try again.')
+    return response.json()
+})()
 </script>`
 
 export async function getUploadPage(_req: FastifyRequest, res: FastifyReply) {
@@ -65,7 +66,8 @@ document.querySelector('#upload').addEventListener('submit', async event => {
     data.set('name', file.name)
     data.set('type', file.type || 'application/octet-stream')
     try {
-        const response = await fetch('/api/files', { method: 'POST', headers: auth, body: data })
+        if (!await window.cdnAuth) return
+        const response = await fetch('/api/files', { method: 'POST', body: data, credentials: 'same-origin' })
         if (response.status === 401) return login()
         const result = await response.json()
         if (!response.ok) throw Error(result.error || 'Upload failed.')
@@ -74,6 +76,13 @@ document.querySelector('#upload').addEventListener('submit', async event => {
         link.href = '/files/' + encodeURIComponent(result.id)
         link.textContent = location.origin + link.pathname
         status.append(link)
+        if (/^image\/(jpeg|png|gif|webp|avif)$/i.test(file.type)) {
+            const preview = document.createElement('img')
+            preview.className = 'preview'
+            preview.src = link.pathname
+            preview.alt = file.name
+            status.append(preview)
+        }
     } catch (error) {
         status.textContent = error.message || 'Upload failed.'
     }
@@ -128,13 +137,15 @@ export async function getGalleryPage(_req: FastifyRequest, res: FastifyReply) {
 ${authScript}
 <script>
 const root = document.querySelector('#files')
-fetch('/api/files/user/' + encodeURIComponent(auth.id), { headers: auth })
+window.cdnAuth.then(auth => auth && fetch('/api/files/user/' + encodeURIComponent(auth.id), { cache: 'no-store', credentials: 'same-origin' }))
     .then(async response => {
+        if (!response) return null
         if (response.status === 401) return login()
         if (!response.ok) throw Error('Your library could not be loaded.')
         return response.json()
     })
     .then(files => {
+        if (!files) return
         root.textContent = ''
         if (!files.length) { root.textContent = 'No files yet.'; return }
         for (const file of files) {
@@ -147,6 +158,14 @@ fetch('/api/files/user/' + encodeURIComponent(auth.id), { headers: auth })
             meta.className = 'muted'
             meta.textContent = file.type + ' · ' + new Date(file.uploaded_at).toLocaleString()
             row.append(link, meta)
+            if (/^image\/(jpeg|png|gif|webp|avif)$/i.test(file.type)) {
+                const preview = document.createElement('img')
+                preview.className = 'preview'
+                preview.src = link.href
+                preview.alt = file.name
+                preview.loading = 'lazy'
+                row.append(preview)
+            }
             root.append(row)
         }
     })

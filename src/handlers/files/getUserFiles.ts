@@ -1,6 +1,7 @@
 import type { FastifyReply, FastifyRequest } from 'fastify'
 import run from '#db'
 import tokenWrapper from '#utils/auth/tokenWrapper.ts'
+import { getSessionUserId } from '#utils/auth/session.ts'
 
 type UserFilesParams = {
     id: string
@@ -23,12 +24,14 @@ export default async function getUserFiles(
     const token = Array.isArray(tokenHeader) ? tokenHeader[0]?.split(' ')[1] : tokenHeader.split(' ')[1]
     const headerUserId = Array.isArray(user) ? user[0] : user
 
-    if (!id || !headerUserId || !token) {
+    if (!id) {
         return res.status(401).send({ error: 'Unauthorized' })
     }
 
-    const auth = await tokenWrapper(headerUserId, token)
-    if (!auth.status || auth.id !== id) {
+    const authenticatedId = headerUserId && token
+        ? (await tokenWrapper(headerUserId, token)).id
+        : await getSessionUserId(req)
+    if (authenticatedId !== id) {
         return res.status(401).send({ error: 'Unauthorized' })
     }
 
