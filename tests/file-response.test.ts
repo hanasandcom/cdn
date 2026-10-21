@@ -68,6 +68,47 @@ describe('legacy file links', () => {
 })
 
 describe('standalone CDN pages', () => {
+    test('keeps the guest hint hidden until the upload picker is ready', async () => {
+        const { html } = await page(getUploadPage)
+        const uploadScript = Array.from(html.matchAll(/<script>([\s\S]*?)<\/script>/g)).at(-1)?.[1]
+        expect(uploadScript).toBeDefined()
+
+        let pickerReady = false
+        let resolvePicker: (() => void) | undefined
+        const pickerDefinition = new Promise<void>(resolve => { resolvePicker = resolve })
+        const hint = { hidden: true }
+        const status = { textContent: '' }
+        const button = { disabled: false }
+        const form = { querySelector: () => button, addEventListener: () => {} }
+        const elements: Record<string, object> = {
+            '#upload': form,
+            '#picker': {},
+            '#status': status,
+            '#upload-hint': hint,
+        }
+        const window = { cdnAuth: Promise.resolve(null) }
+        const customElements = {
+            whenDefined: () => {
+                pickerReady = true
+                return pickerDefinition
+            },
+        }
+
+        new Function('document', 'window', 'customElements', uploadScript!)(
+            { querySelector: (selector: string) => elements[selector] },
+            window,
+            customElements,
+        )
+        await Promise.resolve()
+        expect(pickerReady).toBe(true)
+        expect(hint.hidden).toBe(true)
+
+        resolvePicker?.()
+        await Promise.resolve()
+        await Promise.resolve()
+        expect(hint.hidden).toBe(false)
+    })
+
     test('upload supports guests while the gallery requires a session', async () => {
         const uploadPage = await page(getUploadPage)
         const galleryPage = await page(getGalleryPage)
