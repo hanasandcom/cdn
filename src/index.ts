@@ -4,7 +4,13 @@ import routes from './routes.ts'
 import health from './handlers/index/health.ts'
 import { prepareStorage } from '#utils/fileStorage.ts'
 import getIndex from './handlers/index/get.ts'
-import { getGalleryPage, getLoginPage, getUploadPage } from './handlers/index/staticPages.ts'
+import {
+    getExifReaderScript,
+    getGalleryPage,
+    getLoginPage,
+    getUploadPage,
+    getUploadPickerScript,
+} from './handlers/index/staticPages.ts'
 import login from './handlers/auth/login.ts'
 import getSession from './handlers/auth/session.ts'
 import redirectLegacyFile from './handlers/files/redirectLegacy.ts'
@@ -64,6 +70,8 @@ fastify.register(routes, { prefix: '/api' })
 
 fastify.get('/', getIndex)
 fastify.get('/upload', getUploadPage)
+fastify.get('/assets/exifreader.js', getExifReaderScript)
+fastify.get('/assets/upload-picker.js', getUploadPickerScript)
 fastify.get('/gallery', getGalleryPage)
 fastify.get('/login', getLoginPage)
 fastify.post('/api/auth/login', login)

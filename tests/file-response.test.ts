@@ -1,5 +1,11 @@
 import { describe, expect, test } from 'bun:test'
-import { getGalleryPage, getLoginPage, getUploadPage } from '../src/handlers/index/staticPages.ts'
+import {
+    getExifReaderScript,
+    getGalleryPage,
+    getLoginPage,
+    getUploadPage,
+    getUploadPickerScript,
+} from '../src/handlers/index/staticPages.ts'
 import redirectLegacyFile from '../src/handlers/files/redirectLegacy.ts'
 import { fileResponseHeaders } from '../src/utils/fileResponse.ts'
 
@@ -13,6 +19,17 @@ async function page(handler: typeof getUploadPage) {
     }
     await handler({} as never, reply as never)
     return { html, headers }
+}
+
+async function script(handler: typeof getUploadPickerScript) {
+    let body = ''
+    const reply = {
+        header: () => reply,
+        type: () => reply,
+        send: (value: Buffer) => { body = value.toString(); return body },
+    }
+    await handler({} as never, reply as never)
+    return body
 }
 
 describe('file response safety', () => {
@@ -63,19 +80,11 @@ describe('standalone CDN pages', () => {
         expect(uploadScripts.length).toBeGreaterThan(0)
         expect(() => new Function(uploadScripts[uploadScripts.length - 1][1])).not.toThrow()
         expect(upload).toContain('fetch(\'/api/files\'')
-        expect(upload).toContain('type="file" multiple aria-label="Browse files"')
-        expect(upload).toContain('grid-template-columns: minmax(0,1.05fr) minmax(20rem,.95fr)')
-        expect(upload).toContain('Drop files here')
-        expect(upload).toContain('dropzone.addEventListener(\'drop\'')
-        expect(upload).toContain('fileInput.files = transfer.files')
-        expect(upload).toContain('Browse files')
-        expect(upload).toContain('aria-label="Selected files"')
-        expect(upload).toContain('aria-label="Selected file pages"')
-        expect(upload).toContain('const filesPerPage = 25')
-        expect(upload).toContain('remove.textContent = \'Remove\'')
-        expect(upload).toContain('remove.addEventListener(\'click\'')
-        expect(upload).toContain('Date taken: \' + (date || \'unavailable\')')
-        expect(upload).toContain('formatBytes(file.size)')
+        expect(upload).toContain('<hanasand-upload-picker id="picker" disabled')
+        expect(upload).toContain('if (auth) picker.setAttribute(\'multiple\', \'\')')
+        expect(upload).toContain('/assets/exifreader.js')
+        expect(upload).toContain('/assets/upload-picker.js')
+        expect(upload).toContain('const files = picker.files')
         expect(upload).toContain('fetch(\'/api/files/bulk\'')
         expect(upload).toContain('X-CDN-Upload-Count')
         expect(upload).toContain('if (response.status === 401) return null')
@@ -102,5 +111,19 @@ describe('standalone CDN pages', () => {
         expect(uploadHeaders['Cache-Control']).toBe('private, no-store')
         expect(galleryHeaders['Cache-Control']).toBe('private, no-store')
         expect(loginHeaders['Cache-Control']).toBe('private, no-store')
+    })
+
+    test('serves the shared picker and image metadata assets', async () => {
+        const picker = await script(getUploadPickerScript)
+        const exifReader = await script(getExifReaderScript)
+
+        expect(() => new Function(picker)).not.toThrow()
+        expect(() => new Function(exifReader)).not.toThrow()
+        expect(picker).toContain('this.selectedFiles.concat(incoming)')
+        expect(picker).toContain('gpslatitude')
+        expect(picker).toContain('datetimeoriginal')
+        expect(picker).toContain('Location: ')
+        expect(picker).toContain('uploaded files keep their original metadata')
+        expect(exifReader.length).toBeGreaterThan(100_000)
     })
 })
