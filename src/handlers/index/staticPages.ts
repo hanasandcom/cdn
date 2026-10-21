@@ -33,12 +33,12 @@ button:focus-visible, a:focus-visible, input:focus-visible {
 }
 .intro { max-width: 42rem; margin: .5rem 0 1.5rem; }
 .upload-panel { display: grid; gap: .75rem; }
-.upload-actions { display: flex; justify-content: flex-end; }
+.upload-actions { display: flex; align-items: center; justify-content: space-between; gap: .75rem; flex-wrap: wrap; }
 .upload-submit { min-height: 2.5rem; border: 1px solid #393939; background: #202020; color: #f6f6f3; }
 .upload-submit:hover { border-color: #777; }
 .upload-status { overflow-wrap: anywhere; }
 .upload-status img { margin-top: .75rem; border-radius: .5rem; }
-.upload-hint { margin: 1.5rem 0 0; font-size: .75rem; }
+.upload-hint { margin: 0; font-size: .75rem; }
 .gallery { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 12rem), 1fr)); gap: .75rem; margin-top: 1rem; }
 .file { min-width: 0; overflow: hidden; border: 1px solid #393939; border-radius: .75rem; background: #080808; }
 .file summary { display: block; cursor: pointer; list-style: none; }
@@ -96,11 +96,11 @@ export async function getUploadPage(_req: FastifyRequest, res: FastifyReply) {
 <hanasand-upload-picker id="picker" multiple
     description="Choose files to upload, or drag them into the drop area."></hanasand-upload-picker>
 <div class="upload-actions">
+<p id="upload-hint" class="upload-hint" hidden>Sign in to upload multiple files at once.</p>
 <button class="upload-submit" type="submit">Upload</button>
 </div>
 </form>
 <p id="status" class="upload-status" role="status" aria-live="polite"></p>
-<p id="upload-hint" class="upload-hint" hidden>Sign in to upload multiple files at once.</p>
 <script defer src="/assets/exifreader.js"></script>
 <script defer src="/assets/upload-picker.js"></script>
 ${uploadAuthScript}

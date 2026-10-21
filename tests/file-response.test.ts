@@ -84,6 +84,8 @@ describe('standalone CDN pages', () => {
         expect(upload).not.toContain('class="upload-panel checking-auth"')
         expect(upload).not.toContain('<hanasand-upload-picker id="picker" disabled')
         expect(upload).toContain('id="upload-hint" class="upload-hint" hidden>Sign in to upload multiple files at once.')
+        expect(upload).toContain('.upload-actions { display: flex; align-items: center; justify-content: space-between;')
+        expect(upload.indexOf('id="upload-hint"')).toBeLessThan(upload.indexOf('<button class="upload-submit"'))
         expect(upload).toContain('window.cdnAuth.then(auth => { if (!auth) hint.hidden = false })')
         expect(upload).not.toContain('Checking session')
         const submitScript = uploadScripts[uploadScripts.length - 1][1]
