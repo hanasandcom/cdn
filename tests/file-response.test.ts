@@ -80,11 +80,16 @@ describe('standalone CDN pages', () => {
         expect(uploadScripts.length).toBeGreaterThan(0)
         expect(() => new Function(uploadScripts[uploadScripts.length - 1][1])).not.toThrow()
         expect(upload).toContain('fetch(\'/api/files\'')
-        expect(upload).toContain('<hanasand-upload-picker id="picker" disabled')
-        expect(upload).toContain('if (auth) picker.setAttribute(\'multiple\', \'\')')
+        expect(upload).toContain('<hanasand-upload-picker id="picker" multiple')
+        expect(upload).not.toContain('class="upload-panel checking-auth"')
+        expect(upload).not.toContain('<hanasand-upload-picker id="picker" disabled')
         expect(upload).toContain('id="upload-hint" class="upload-hint" hidden>Sign in to upload multiple files at once.')
-        expect(upload).toContain('else hint.hidden = false')
-        expect(upload).toContain('form.classList.remove(\'checking-auth\')')
+        expect(upload).toContain('window.cdnAuth.then(auth => { if (!auth) hint.hidden = false })')
+        expect(upload).not.toContain('Checking session')
+        const submitScript = uploadScripts[uploadScripts.length - 1][1]
+        expect(submitScript.indexOf('const auth = await window.cdnAuth')).toBeLessThan(
+            submitScript.indexOf('status.textContent = \'Preparing upload…\''),
+        )
         expect(upload).toContain('/assets/exifreader.js')
         expect(upload).toContain('/assets/upload-picker.js')
         expect(upload).toContain('const files = picker.files')
