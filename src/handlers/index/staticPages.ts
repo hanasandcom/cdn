@@ -92,7 +92,7 @@ window.cdnAuth = (async () => {
 export async function getUploadPage(_req: FastifyRequest, res: FastifyReply) {
     const body = `<p class="intro">Upload images, videos or files.</p>
 <form id="upload" class="upload-panel">
-<hanasand-upload-picker id="picker" disabled
+<hanasand-upload-picker id="picker" multiple disabled
     description="Choose files to upload, or drag them into the drop area."></hanasand-upload-picker>
 <div class="upload-actions">
 <button class="upload-submit" type="submit">Upload</button>
@@ -108,8 +108,7 @@ const picker = document.querySelector('#picker')
 const status = document.querySelector('#status')
 const button = form.querySelector('.upload-submit')
 button.disabled = true
-Promise.all([customElements.whenDefined('hanasand-upload-picker'), window.cdnAuth]).then(([, auth]) => {
-    if (auth) picker.setAttribute('multiple', '')
+Promise.all([customElements.whenDefined('hanasand-upload-picker'), window.cdnAuth]).then(() => {
     picker.removeAttribute('disabled')
     button.disabled = false
 }).catch(() => { status.textContent = 'Sign-in could not be checked. Reload to try again.' })
