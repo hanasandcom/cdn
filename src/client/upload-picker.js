@@ -197,9 +197,9 @@
                     * { box-sizing: border-box; }
                     [hidden] { display: none !important; }
                     button, input { font: inherit; }
-                    .panel { display: grid; overflow: hidden; grid-template-columns: minmax(0, 1.05fr) minmax(0, .95fr); border: 1px solid var(--ui-border, #393939); border-radius: .75rem; background: var(--ui-panel, #101010); box-shadow: 0 8px 24px #0005; }
-                    .drop-side { display: none; min-height: 26.25rem; place-items: center; border-right: 1px solid var(--ui-border, #393939); background: var(--ui-raised, #191919); padding: 1.5rem; }
-                    .dropzone { display: grid; width: 100%; min-height: 21rem; place-content: center; justify-items: center; gap: 1rem; border: 1px dashed var(--ui-border, #393939); border-radius: .75rem; background: var(--ui-panel, #101010); padding: 2rem; text-align: center; cursor: pointer; transition: border-color .15s, background .15s; }
+                    .panel { display: grid; overflow: hidden; grid-template-columns: minmax(0, 1fr); border: 1px solid var(--ui-border, #393939); border-radius: .75rem; background: var(--ui-panel, #101010); box-shadow: 0 8px 24px #0005; }
+                    .drop-side { display: grid; min-height: 11rem; place-items: center; border-bottom: 1px solid var(--ui-border, #393939); background: var(--ui-raised, #191919); padding: .75rem; }
+                    .dropzone { display: grid; width: 100%; min-height: 9rem; place-content: center; justify-items: center; gap: 1rem; border: 1px dashed var(--ui-border, #393939); border-radius: .75rem; background: var(--ui-panel, #101010); padding: 1.25rem; text-align: center; cursor: pointer; transition: border-color .15s, background .15s; }
                     .dropzone:hover, .dropzone.dragging, .dropzone:focus-visible { border-color: var(--ui-primary, #f6f6f3); background: color-mix(in srgb, var(--ui-primary, #f6f6f3) 8%, var(--ui-panel, #101010)); outline: none; }
                     .drop-icon { display: grid; width: 3rem; height: 3rem; place-items: center; border: 1px solid var(--ui-border, #393939); border-radius: .65rem; color: var(--ui-primary, #f6f6f3); font-size: 1.5rem; }
                     .drop-title { color: var(--ui-text, #f6f6f3); font-size: .875rem; font-weight: 650; }
@@ -231,7 +231,7 @@
                     .remove-button { min-height: 2rem; padding: .4rem .55rem; font-size: .75rem; }
                     .empty { margin: 0; color: var(--ui-muted, #aaa); font-size: .875rem; }
                     .extras, .actions { display: grid; gap: .75rem; }
-                    @media (min-width: 48rem) { .drop-side { display: grid; } .upload-side { gap: 1.25rem; padding: 1.5rem; } }
+                    @media (min-width: 48rem) { .panel { grid-template-columns: minmax(0, 1.05fr) minmax(0, .95fr); } .drop-side { min-height: 26.25rem; border-right: 1px solid var(--ui-border, #393939); border-bottom: 0; padding: 1.5rem; } .dropzone { min-height: 21rem; padding: 2rem; } .upload-side { gap: 1.25rem; padding: 1.5rem; } }
                 </style>
                 <div class="panel">
                     <div class="drop-side"><div class="dropzone" id="dropzone" role="button" tabindex="0" aria-label="Drop files here or browse files"><span class="drop-icon" aria-hidden="true">↑</span><strong class="drop-title">Drop files here</strong><span class="muted">or choose files from the other panel</span></div></div>

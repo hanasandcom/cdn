@@ -38,6 +38,7 @@ button:focus-visible, a:focus-visible, input:focus-visible {
 .upload-submit:hover { border-color: #777; }
 .upload-status { overflow-wrap: anywhere; }
 .upload-status img { margin-top: .75rem; border-radius: .5rem; }
+.upload-hint { margin: 1.5rem 0 0; font-size: .75rem; }
 .gallery { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 12rem), 1fr)); gap: .75rem; margin-top: 1rem; }
 .file { min-width: 0; overflow: hidden; border: 1px solid #393939; border-radius: .75rem; background: #080808; }
 .file summary { display: block; cursor: pointer; list-style: none; }
@@ -92,13 +93,14 @@ window.cdnAuth = (async () => {
 export async function getUploadPage(_req: FastifyRequest, res: FastifyReply) {
     const body = `<p class="intro">Upload images, videos or files.</p>
 <form id="upload" class="upload-panel">
-<hanasand-upload-picker id="picker" multiple disabled
+<hanasand-upload-picker id="picker" disabled
     description="Choose files to upload, or drag them into the drop area."></hanasand-upload-picker>
 <div class="upload-actions">
 <button class="upload-submit" type="submit">Upload</button>
 </div>
 </form>
 <p id="status" class="upload-status" role="status" aria-live="polite"></p>
+<p class="upload-hint">Sign in to upload multiple files at once.</p>
 <script defer src="/assets/exifreader.js"></script>
 <script defer src="/assets/upload-picker.js"></script>
 ${uploadAuthScript}
@@ -108,7 +110,8 @@ const picker = document.querySelector('#picker')
 const status = document.querySelector('#status')
 const button = form.querySelector('.upload-submit')
 button.disabled = true
-Promise.all([customElements.whenDefined('hanasand-upload-picker'), window.cdnAuth]).then(() => {
+Promise.all([customElements.whenDefined('hanasand-upload-picker'), window.cdnAuth]).then(([, auth]) => {
+    if (auth) picker.setAttribute('multiple', '')
     picker.removeAttribute('disabled')
     button.disabled = false
 }).catch(() => { status.textContent = 'Sign-in could not be checked. Reload to try again.' })
