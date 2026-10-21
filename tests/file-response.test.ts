@@ -122,6 +122,7 @@ describe('standalone CDN pages', () => {
         expect(picker).toContain('this.selectedFiles.concat(incoming)')
         expect(picker).toContain('gpslatitude')
         expect(picker).toContain('datetimeoriginal')
+        expect(picker).toContain('tags.pngText')
         expect(picker).toContain('Location: ')
         expect(picker).toContain('uploaded files keep their original metadata')
         expect(exifReader.length).toBeGreaterThan(100_000)

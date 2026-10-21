@@ -32,8 +32,14 @@
         value = valueOf(value)
         if (typeof value === 'string') return value.trim()
         if (typeof value === 'number' && Number.isFinite(value)) return String(value)
-        if (Array.isArray(value) && value.length && value.every(item => Number.isInteger(item) && item >= 0 && item <= 255)) {
-            return new TextDecoder().decode(new Uint8Array(value)).replace(/\0+$/g, '').trim()
+        if (Array.isArray(value) && value.length) {
+            if (value.every(item => Number.isInteger(item) && item >= 0 && item <= 255)) {
+                return new TextDecoder().decode(new Uint8Array(value)).replace(/\0+$/g, '').trim()
+            }
+            for (const item of value) {
+                const text = metadataText(item)
+                if (text) return text
+            }
         }
         return ''
     }
@@ -55,6 +61,7 @@
             ['Taken', tags.exif, ['datetimeoriginal', 'dateTimeOriginal']],
             ['Taken', tags.xmp, ['datetimeoriginal', 'datecreated', 'createdate', 'creationdate']],
             ['Taken', tags.iptc, ['datecreated']],
+            ['Taken', tags.pngText, ['datetimeoriginal', 'datecreated', 'createdate', 'creationtime', 'timestamp']],
             ['Digitized', tags.exif, ['datetimedigitized']],
             ['Digitized', tags.xmp, ['createdate', 'digitalcreationdate']],
             ['Image date', tags.exif, ['datetime']],
