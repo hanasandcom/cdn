@@ -20,7 +20,7 @@ const styles = `
 [hidden] { display: none !important; }
 body { margin: 0; min-height: 100vh; padding: 2rem 1rem; display: grid; place-items: center; }
 main { width: min(100%, 58rem); padding: 2rem; border: 1px solid #393939; border-radius: 1rem; background: #101010; }
-main.login-page { width: min(100%, 24rem); padding: 1.25rem; }
+main.login-page { width: min(100%, 24rem); max-width: 24rem; padding: 1.25rem; }
 main.gallery-page { width: min(100%, 96rem); }
 a { color: inherit; }
 header { display: flex; justify-content: space-between; align-items: center; gap: 1rem; }
@@ -36,7 +36,11 @@ input:focus {
     background: #121212; color: #f6f6f3; border-color: #777;
 }
 input::selection { background: #454545; color: #fff; }
-input:-webkit-autofill, input:-webkit-autofill:hover, input:-webkit-autofill:focus, input:-webkit-autofill:active {
+input:-webkit-autofill {
+    -webkit-text-fill-color: #f6f6f3; caret-color: #f6f6f3;
+    -webkit-box-shadow: 0 0 0 1000px #121212 inset; box-shadow: 0 0 0 1000px #121212 inset;
+}
+input:autofill {
     -webkit-text-fill-color: #f6f6f3; caret-color: #f6f6f3;
     -webkit-box-shadow: 0 0 0 1000px #121212 inset; box-shadow: 0 0 0 1000px #121212 inset;
 }
@@ -46,9 +50,9 @@ button:focus-visible, a:focus-visible, input:focus-visible {
     outline: 2px solid #999;
     outline-offset: 3px;
 }
-.login-form { display: grid; gap: .5rem; }
-.login-form label { margin-top: .25rem; }
-.login-form label:first-child { margin-top: 0; }
+.login-form { display: grid; gap: 1rem; }
+.login-field { display: grid; gap: .5rem; }
+.login-form label { margin: 0; }
 .login-form input { min-height: 2.75rem; }
 .login-form .actions { margin-top: .35rem; }
 .intro { max-width: 42rem; margin: .5rem 0 1.5rem; }
@@ -390,10 +394,14 @@ form.addEventListener('submit', async event => {
 export async function getLoginPage(_req: FastifyRequest, res: FastifyReply) {
     const body = `<p>Sign in to your Hanasand account to upload files and view your library.</p>
 <form id="login" class="login-form">
+<div class="login-field">
 <label for="username">Username</label>
 <input id="username" name="username" autocomplete="username" required>
+</div>
+<div class="login-field">
 <label for="password">Password</label>
 <input id="password" name="password" type="password" autocomplete="current-password" required>
+</div>
 <div class="actions"><button id="submit">Sign in</button></div>
 </form>
 <p id="status" role="status" aria-live="polite"></p>
