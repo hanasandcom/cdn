@@ -20,7 +20,7 @@ const styles = `
 [hidden] { display: none !important; }
 body { margin: 0; min-height: 100vh; padding: 2rem 1rem; display: grid; place-items: center; }
 main { width: min(100%, 58rem); padding: 2rem; border: 1px solid #393939; border-radius: 1rem; background: #101010; }
-main.login-page { width: min(100%, 20rem); max-width: 20rem; padding: 1.25rem; }
+main.login-page { width: min(100%, 18rem); max-width: 18rem; padding: 1.25rem; }
 main.gallery-page { width: min(100%, 96rem); }
 a { color: inherit; }
 header { display: flex; justify-content: space-between; align-items: center; gap: 1rem; }
@@ -32,8 +32,8 @@ input {
     appearance: none; width: 100%; background: #080808; color: #f6f6f3;
     border: 1px solid #393939; caret-color: #f6f6f3;
 }
-input:focus {
-    background: #080808; color: #f6f6f3; border-color: #707070;
+input:focus, input:focus-visible {
+    background-color: #080808; color: #f6f6f3; border-color: #707070;
 }
 input::selection { background: #303030; color: #f6f6f3; }
 input:-webkit-autofill {
@@ -52,7 +52,7 @@ button:focus-visible, a:focus-visible, input:focus-visible {
 }
 input:focus-visible { outline-color: #707070; outline-offset: 2px; }
 .login-form { display: grid; gap: 1rem; }
-.login-field { display: grid; gap: 1rem; }
+.login-field { display: grid; gap: 1.25rem; }
 .login-form label { margin: 0; }
 .login-form input { min-height: 2.75rem; }
 .login-form .actions { margin-top: .35rem; }
