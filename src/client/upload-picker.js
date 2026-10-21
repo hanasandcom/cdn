@@ -229,7 +229,6 @@
                     .metadata-item svg { width: .9rem; height: .9rem; flex: none; stroke: currentColor; stroke-width: 1.75; fill: none; stroke-linecap: round; stroke-linejoin: round; }
                     .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; }
                     .remove-button { min-height: 2rem; padding: .4rem .55rem; font-size: .75rem; }
-                    .empty { margin: 0; color: var(--ui-muted, #aaa); font-size: .875rem; }
                     .extras, .actions { display: grid; gap: .75rem; }
                     @media (min-width: 48rem) { .panel { grid-template-columns: minmax(0, 1.05fr) minmax(0, .95fr); } .drop-side { min-height: 26.25rem; border-right: 1px solid var(--ui-border, #393939); border-bottom: 0; padding: 1.5rem; } .dropzone { min-height: 21rem; padding: 2rem; } .upload-side { gap: 1.25rem; padding: 1.5rem; } }
                 </style>
@@ -338,13 +337,7 @@
             this.shadowRoot.querySelector('#previous').disabled = this.page === 0
             this.shadowRoot.querySelector('#next').disabled = this.page >= pageCount - 1
             this.reviewButton.hidden = !this.hasAttribute('review-button') || this.selectedFiles.length === 0
-            if (!this.selectedFiles.length) {
-                const empty = document.createElement('li')
-                empty.className = 'empty'
-                empty.textContent = 'No files selected'
-                this.list.append(empty)
-                return
-            }
+            if (!this.selectedFiles.length) return
             const start = this.page * filesPerPage
             this.selectedFiles.slice(start, start + filesPerPage).forEach((file, index) => {
                 const row = document.createElement('li')

@@ -125,6 +125,7 @@ describe('standalone CDN pages', () => {
         expect(() => new Function(picker)).not.toThrow()
         expect(() => new Function(exifReader)).not.toThrow()
         expect(picker).toContain('this.selectedFiles.concat(incoming)')
+        expect(picker).not.toContain('No files selected')
         expect(picker).toContain('.drop-side { display: grid; min-height: 11rem;')
         expect(picker).toContain('.panel { grid-template-columns: minmax(0, 1.05fr) minmax(0, .95fr); }')
         expect(picker).toContain('gpslatitude')
