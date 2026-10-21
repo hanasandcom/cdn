@@ -20,7 +20,7 @@ const styles = `
 [hidden] { display: none !important; }
 body { margin: 0; min-height: 100vh; padding: 2rem 1rem; display: grid; place-items: center; }
 main { width: min(100%, 58rem); padding: 2rem; border: 1px solid #393939; border-radius: 1rem; background: #101010; }
-main.login-page { width: min(100%, 24rem); max-width: 24rem; padding: 1.25rem; }
+main.login-page { width: min(100%, 20rem); max-width: 20rem; padding: 1.25rem; }
 main.gallery-page { width: min(100%, 96rem); }
 a { color: inherit; }
 header { display: flex; justify-content: space-between; align-items: center; gap: 1rem; }
@@ -33,16 +33,16 @@ input {
     border: 1px solid #393939; caret-color: #f6f6f3;
 }
 input:focus {
-    background: #121212; color: #f6f6f3; border-color: #777;
+    background: #080808; color: #f6f6f3; border-color: #707070;
 }
-input::selection { background: #454545; color: #fff; }
+input::selection { background: #303030; color: #f6f6f3; }
 input:-webkit-autofill {
     -webkit-text-fill-color: #f6f6f3; caret-color: #f6f6f3;
-    -webkit-box-shadow: 0 0 0 1000px #121212 inset; box-shadow: 0 0 0 1000px #121212 inset;
+    -webkit-box-shadow: 0 0 0 1000px #080808 inset; box-shadow: 0 0 0 1000px #080808 inset;
 }
 input:autofill {
     -webkit-text-fill-color: #f6f6f3; caret-color: #f6f6f3;
-    -webkit-box-shadow: 0 0 0 1000px #121212 inset; box-shadow: 0 0 0 1000px #121212 inset;
+    -webkit-box-shadow: 0 0 0 1000px #080808 inset; box-shadow: 0 0 0 1000px #080808 inset;
 }
 button { border: 0; background: #f6f6f3; color: #111; font-weight: 600; cursor: pointer; }
 button:disabled { cursor: wait; opacity: .65; }
@@ -50,8 +50,9 @@ button:focus-visible, a:focus-visible, input:focus-visible {
     outline: 2px solid #999;
     outline-offset: 3px;
 }
+input:focus-visible { outline-color: #707070; outline-offset: 2px; }
 .login-form { display: grid; gap: 1rem; }
-.login-field { display: grid; gap: .5rem; }
+.login-field { display: grid; gap: 1rem; }
 .login-form label { margin: 0; }
 .login-form input { min-height: 2.75rem; }
 .login-form .actions { margin-top: .35rem; }
