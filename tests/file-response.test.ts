@@ -9,7 +9,7 @@ import {
 import redirectLegacyFile from '../src/handlers/files/redirectLegacy.ts'
 import { fileResponseHeaders } from '../src/utils/fileResponse.ts'
 
-async function page(handler: typeof getUploadPage) {
+async function page(handler: typeof getUploadPage, request = {}) {
     let html = ''
     const headers: Record<string, string> = {}
     const reply = {
@@ -17,7 +17,7 @@ async function page(handler: typeof getUploadPage) {
         type: () => reply,
         send: (body: string) => { html = body; return body },
     }
-    await handler({} as never, reply as never)
+    await handler({ headers: {}, ...request } as never, reply as never)
     return { html, headers }
 }
 
@@ -68,45 +68,21 @@ describe('legacy file links', () => {
 })
 
 describe('standalone CDN pages', () => {
-    test('keeps the guest hint hidden until the upload picker is ready', async () => {
+    test('renders the guest state and picker fallback in the initial upload HTML', async () => {
         const { html } = await page(getUploadPage)
-        const uploadScript = Array.from(html.matchAll(/<script>([\s\S]*?)<\/script>/g)).at(-1)?.[1]
+        const scripts = Array.from(html.matchAll(/<script>([\s\S]*?)<\/script>/g))
+        const authScript = scripts[0]?.[1]
+        const uploadScript = scripts.at(-1)?.[1]
+
+        expect(authScript).toContain('window.cdnAuth = Promise.resolve(null)')
         expect(uploadScript).toBeDefined()
-
-        let pickerReady = false
-        let resolvePicker: (() => void) | undefined
-        const pickerDefinition = new Promise<void>(resolve => { resolvePicker = resolve })
-        const hint = { hidden: true }
-        const status = { textContent: '' }
-        const button = { disabled: false }
-        const form = { querySelector: () => button, addEventListener: () => {} }
-        const elements: Record<string, object> = {
-            '#upload': form,
-            '#picker': {},
-            '#status': status,
-            '#upload-hint': hint,
-        }
-        const window = { cdnAuth: Promise.resolve(null) }
-        const customElements = {
-            whenDefined: () => {
-                pickerReady = true
-                return pickerDefinition
-            },
-        }
-
-        new Function('document', 'window', 'customElements', uploadScript!)(
-            { querySelector: (selector: string) => elements[selector] },
-            window,
-            customElements,
-        )
-        await Promise.resolve()
-        expect(pickerReady).toBe(true)
-        expect(hint.hidden).toBe(true)
-
-        resolvePicker?.()
-        await Promise.resolve()
-        await Promise.resolve()
-        expect(hint.hidden).toBe(false)
+        expect(() => new Function(uploadScript!)).not.toThrow()
+        expect(html).toContain('id="upload-hint" class="upload-hint">Sign in to upload multiple files at once.')
+        expect(html).toContain('<div class="picker-fallback" aria-hidden="true">')
+        expect(html).toContain('picker-fallback-dropzone')
+        expect(html).not.toContain('/api/auth/session')
+        expect(html).not.toContain('customElements.whenDefined')
+        expect(html).not.toContain('hint.hidden')
     })
 
     test('upload supports guests while the gallery requires a session', async () => {
@@ -124,11 +100,11 @@ describe('standalone CDN pages', () => {
         expect(upload).toContain('<hanasand-upload-picker id="picker" multiple')
         expect(upload).not.toContain('class="upload-panel checking-auth"')
         expect(upload).not.toContain('<hanasand-upload-picker id="picker" disabled')
-        expect(upload).toContain('id="upload-hint" class="upload-hint" hidden>Sign in to upload multiple files at once.')
+        expect(upload).toContain('id="upload-hint" class="upload-hint">Sign in to upload multiple files at once.')
         expect(upload).toContain('.upload-actions { display: flex; align-items: center; justify-content: space-between;')
         expect(upload.indexOf('id="upload-hint"')).toBeLessThan(upload.indexOf('<button class="upload-submit"'))
-        expect(upload).toContain('await customElements.whenDefined(\'hanasand-upload-picker\')')
-        expect(upload).toContain('if (!auth) hint.hidden = false')
+        expect(upload).not.toContain('customElements.whenDefined')
+        expect(upload).not.toContain('hint.hidden')
         expect(upload).not.toContain('status.textContent = \'Sign-in could not be checked. Reload to try again.\'')
         expect(upload).not.toContain('Checking session')
         const submitScript = uploadScripts[uploadScripts.length - 1][1]
@@ -140,7 +116,7 @@ describe('standalone CDN pages', () => {
         expect(upload).toContain('const files = picker.files')
         expect(upload).toContain('fetch(\'/api/files/bulk\'')
         expect(upload).toContain('X-CDN-Upload-Count')
-        expect(upload).toContain('if (response.status === 401) return null')
+        expect(upload).toContain('if (response.status === 401) return login()')
         expect(upload).toContain('if (!auth) {')
         expect(upload).toContain('await wait(1000)')
         expect(upload).toContain('const batch = files.slice(start, end)')

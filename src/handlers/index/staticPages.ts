@@ -1,5 +1,6 @@
 import type { FastifyReply, FastifyRequest } from 'fastify'
 import { readFile } from 'node:fs/promises'
+import { getSessionUserId } from '#utils/auth/session.ts'
 
 const uploadPickerPath = new URL('../../client/upload-picker.js', import.meta.url)
 const exifReaderPath = new URL('../../../node_modules/exifreader/dist/exif-reader.js', import.meta.url)
@@ -39,6 +40,35 @@ button:focus-visible, a:focus-visible, input:focus-visible {
 .upload-status { overflow-wrap: anywhere; }
 .upload-status img { margin-top: .75rem; border-radius: .5rem; }
 .upload-hint { margin: 0; font-size: .75rem; }
+hanasand-upload-picker { display: block; }
+.picker-fallback {
+    display: grid; overflow: hidden; grid-template-columns: minmax(0, 1fr);
+    border: 1px solid #393939; border-radius: .75rem; background: #101010;
+    box-shadow: 0 8px 24px #0005;
+}
+.picker-fallback-drop-side {
+    display: grid; min-height: 11rem; place-items: center;
+    border-bottom: 1px solid #393939; background: #191919; padding: .75rem;
+}
+.picker-fallback-dropzone {
+    display: grid; width: 100%; min-height: 9rem; place-content: center;
+    justify-items: center; gap: 1rem; border: 1px dashed #393939;
+    border-radius: .75rem; background: #101010; padding: 1.25rem; text-align: center;
+}
+.picker-fallback-icon {
+    display: grid; width: 3rem; height: 3rem; place-items: center;
+    border: 1px solid #393939; border-radius: .65rem; color: #f6f6f3; font-size: 1.5rem;
+}
+.picker-fallback-title { color: #f6f6f3; font-size: .875rem; font-weight: 650; }
+.picker-fallback-muted { color: #aaa; font-size: .8rem; }
+.picker-fallback-side { display: grid; min-width: 0; align-content: start; gap: 1rem; padding: 1.25rem; }
+.picker-fallback-description { margin: 0; color: #aaa; font-size: .875rem; line-height: 1.5; }
+.picker-fallback-browse {
+    display: flex; min-height: 2.75rem; align-items: center; justify-content: center;
+    border: 1px solid transparent; border-radius: .6rem; background: #f6f6f3;
+    color: #111; padding: .7rem .85rem; font-size: .875rem; font-weight: 650; text-align: center;
+}
+hanasand-upload-picker:defined > .picker-fallback { display: none; }
 .gallery { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 12rem), 1fr)); gap: .75rem; margin-top: 1rem; }
 .file { min-width: 0; overflow: hidden; border: 1px solid #393939; border-radius: .75rem; background: #080808; }
 .file summary { display: block; cursor: pointer; list-style: none; }
@@ -50,6 +80,12 @@ button:focus-visible, a:focus-visible, input:focus-visible {
 .file-info { padding: .75rem; overflow-wrap: anywhere; }
 .file-info p { margin: .25rem 0; }
 .muted { color: #aaa; }
+@media (min-width: 48rem) {
+    .picker-fallback { grid-template-columns: minmax(0, 1.05fr) minmax(0, .95fr); }
+    .picker-fallback-drop-side { min-height: 26.25rem; border-right: 1px solid #393939; border-bottom: 0; padding: 1.5rem; }
+    .picker-fallback-dropzone { min-height: 21rem; padding: 2rem; }
+    .picker-fallback-side { gap: 1.25rem; padding: 1.5rem; }
+}
 `
 
 function shell(title: string, body: string) {
@@ -79,41 +115,47 @@ window.cdnAuth = (async () => {
 })()
 </script>`
 
-const uploadAuthScript = `<script>
+function uploadAuthScript(userId: string | null) {
+    const auth = userId ? JSON.stringify({ id: userId }) : 'null'
+    return `<script>
 const login = () => location.replace('/login?returnTo=' + encodeURIComponent(location.pathname))
 const fileUrl = id => '/api/files/' + encodeURIComponent(id)
-window.cdnAuth = (async () => {
-    const response = await fetch('/api/auth/session', { cache: 'no-store', credentials: 'same-origin' })
-    if (response.status === 401) return null
-    if (!response.ok) throw Error('Your session could not be checked. Reload to try again.')
-    return response.json()
-})()
+window.cdnAuth = Promise.resolve(${auth})
 </script>`
+}
 
-export async function getUploadPage(_req: FastifyRequest, res: FastifyReply) {
+export async function getUploadPage(req: FastifyRequest, res: FastifyReply) {
+    const userId = await getSessionUserId(req)
+    const guestHint = userId ? '' : '<p id="upload-hint" class="upload-hint">Sign in to upload multiple files at once.</p>'
     const body = `<p class="intro">Upload images, videos or files.</p>
 <form id="upload" class="upload-panel">
 <hanasand-upload-picker id="picker" multiple
-    description="Choose files to upload, or drag them into the drop area."></hanasand-upload-picker>
+    description="Choose files to upload, or drag them into the drop area.">
+<div class="picker-fallback" aria-hidden="true">
+<div class="picker-fallback-drop-side">
+<div class="picker-fallback-dropzone"><span class="picker-fallback-icon">↑</span>
+<span class="picker-fallback-title">Drop files here</span>
+<span class="picker-fallback-muted">or choose files to upload</span></div>
+</div>
+<div class="picker-fallback-side">
+<p class="picker-fallback-description">Choose files to upload, or drag them into the drop area.</p>
+<span class="picker-fallback-browse">Browse files</span></div>
+</div>
+</hanasand-upload-picker>
 <div class="upload-actions">
-<p id="upload-hint" class="upload-hint" hidden>Sign in to upload multiple files at once.</p>
+${guestHint}
 <button class="upload-submit" type="submit">Upload</button>
 </div>
 </form>
 <p id="status" class="upload-status" role="status" aria-live="polite"></p>
 <script defer src="/assets/exifreader.js"></script>
 <script defer src="/assets/upload-picker.js"></script>
-${uploadAuthScript}
+${uploadAuthScript(userId)}
 <script>
 const form = document.querySelector('#upload')
 const picker = document.querySelector('#picker')
 const status = document.querySelector('#status')
-const hint = document.querySelector('#upload-hint')
 const button = form.querySelector('.upload-submit')
-window.cdnAuth.then(async auth => {
-    await customElements.whenDefined('hanasand-upload-picker')
-    if (!auth) hint.hidden = false
-}, () => {})
 const wait = ms => new Promise(resolve => setTimeout(resolve, ms))
 const addLink = (parent, url, text) => {
     const link = document.createElement('a')
