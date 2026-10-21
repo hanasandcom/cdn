@@ -110,8 +110,10 @@ const picker = document.querySelector('#picker')
 const status = document.querySelector('#status')
 const hint = document.querySelector('#upload-hint')
 const button = form.querySelector('.upload-submit')
-window.cdnAuth.then(auth => { if (!auth) hint.hidden = false })
-    .catch(() => { status.textContent = 'Sign-in could not be checked. Reload to try again.' })
+window.cdnAuth.then(async auth => {
+    await customElements.whenDefined('hanasand-upload-picker')
+    if (!auth) hint.hidden = false
+}, () => {})
 const wait = ms => new Promise(resolve => setTimeout(resolve, ms))
 const addLink = (parent, url, text) => {
     const link = document.createElement('a')
