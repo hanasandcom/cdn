@@ -43,18 +43,28 @@
         }
         return ''
     }
+    const displayDate = (date, includeTime = true) => {
+        const day = String(date.getDate()).padStart(2, '0')
+        const month = String(date.getMonth() + 1).padStart(2, '0')
+        const year = String(date.getFullYear()).slice(-2)
+        const hours = String(date.getHours()).padStart(2, '0')
+        const minutes = String(date.getMinutes()).padStart(2, '0')
+        return `${day}.${month}.${year}${includeTime ? ` ${hours}:${minutes}` : ''}`
+    }
     const readableDate = value => {
         const raw = metadataText(value)
         if (!raw) return null
         const match = raw.match(/^(\d{4})[:/-]?(\d{2})[:/-]?(\d{2})(?:[ T](\d{2}):(\d{2}):(\d{2})(?:\.(\d+))?(Z|[+-]\d{2}:?\d{2})?)?$/)
         if (match) {
-            const [, year, month, day, hour, minute, second, fraction, zone] = match
-            const date = `${year}-${month}-${day}`
-            return hour === undefined ? date : `${date} ${hour}:${minute}:${second}${fraction ? `.${fraction}` : ''}${zone ? ` ${zone}` : ''}`
+            const [, year, month, day, hour, minute, second, , zone] = match
+            const date = zone
+                ? new Date(Date.parse(`${year}-${month}-${day}T${hour || '00'}:${minute || '00'}:${second || '00'}${zone}`))
+                : new Date(Number(year), Number(month) - 1, Number(day), Number(hour || 0), Number(minute || 0), Number(second || 0))
+            return Number.isFinite(date.getTime()) ? displayDate(date, hour !== undefined) : null
         }
         const parsed = Date.parse(raw)
         if (!Number.isFinite(parsed)) return null
-        return new Date(parsed).toLocaleString()
+        return displayDate(new Date(parsed))
     }
     const dateFromTags = tags => {
         const groups = [
@@ -72,7 +82,7 @@
                 const key = normalizeKey(entry.path)
                 if (!wanted.some(candidate => key === candidate || key.endsWith(candidate))) continue
                 const date = readableDate(entry.value)
-                if (date) return `${label}: ${date}`
+                if (date) return { label, value: date }
             }
         }
         return null
@@ -92,17 +102,61 @@
             }
         }
         const gps = tags.gps || {}
+        const rational = value => {
+            if (typeof value === 'number' && Number.isFinite(value)) return value
+            if (value && typeof value === 'object' && 'numerator' in value && 'denominator' in value) {
+                const denominator = Number(value.denominator)
+                return denominator ? Number(value.numerator) / denominator : null
+            }
+            if (Array.isArray(value) && value.length === 2) {
+                const denominator = Number(value[1])
+                return denominator ? Number(value[0]) / denominator : null
+            }
+            return null
+        }
+        const coordinateValue = (value, reference) => {
+            value = valueOf(value)
+            let result = rational(value)
+            if (result === null && Array.isArray(value)) {
+                let parts = value.map(rational)
+                if (parts.length === 6 && parts.every(Number.isFinite)) parts = [parts[0] / parts[1], parts[2] / parts[3], parts[4] / parts[5]]
+                if (parts.length >= 3 && parts.slice(0, 3).every(Number.isFinite)) {
+                    result = Math.abs(parts[0]) + Math.abs(parts[1]) / 60 + Math.abs(parts[2]) / 3600
+                } else if (parts.length === 1) result = parts[0]
+            }
+            if (result === null && value && typeof value === 'object') {
+                if ('computed' in value) result = coordinateValue(value.computed, reference)
+                else if ('value' in value) result = coordinateValue(value.value, reference)
+            }
+            if (result === null) {
+                const raw = metadataText(value)
+                const numbers = raw.match(/-?\d+(?:\.\d+)?/g)?.map(Number) || []
+                if (numbers.length >= 3) result = Math.abs(numbers[0]) + Math.abs(numbers[1]) / 60 + Math.abs(numbers[2]) / 3600
+                else if (numbers.length) result = numbers[0]
+            }
+            if (!Number.isFinite(result)) return null
+            const referenceText = metadataText(reference).toUpperCase()
+            const valueText = metadataText(value).toUpperCase()
+            const direction = referenceText || (/\b[NSWE]\s*$/.test(valueText) ? valueText.slice(-1) : '')
+            return /[SW]/.test(direction) ? -Math.abs(result) : /[NE]/.test(direction) ? Math.abs(result) : result
+        }
         const coordinate = (latitude, longitude) => {
             if (!Number.isFinite(latitude) || !Number.isFinite(longitude) || Math.abs(latitude) > 90 || Math.abs(longitude) > 180) return null
             return `${latitude.toFixed(5)}, ${longitude.toFixed(5)}`
         }
-        let coordinates = coordinate(gps.Latitude, gps.Longitude)
-        if (!coordinates) {
-            const exifEntries = metadataEntries(tags.exif)
-            const lat = exifEntries.find(entry => normalizeKey(entry.name) === 'gpslatitude')
-            const lon = exifEntries.find(entry => normalizeKey(entry.name) === 'gpslongitude')
-            coordinates = coordinate(Number(lat?.value?.computed), Number(lon?.value?.computed))
+        let latitude = coordinateValue(gps.Latitude)
+        let longitude = coordinateValue(gps.Longitude)
+        if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) {
+            const entries = [...metadataEntries(tags.exif), ...metadataEntries(tags.xmp), ...metadataEntries(tags.iptc), ...metadataEntries(tags.pngText)]
+            const find = names => entries.find(entry => names.includes(normalizeKey(entry.name)))
+            const lat = find(['gpslatitude', 'latitude'])
+            const lon = find(['gpslongitude', 'longitude'])
+            const latRef = find(['gpslatituderef', 'latituderef'])
+            const lonRef = find(['gpslongituderef', 'longituderef'])
+            latitude = coordinateValue(lat?.value, latRef?.value)
+            longitude = coordinateValue(lon?.value, lonRef?.value)
         }
+        const coordinates = coordinate(latitude, longitude)
         if (names.length && coordinates) return `${names.join(', ')} · ${coordinates}`
         if (names.length) return names.join(', ')
         return coordinates
@@ -152,7 +206,6 @@
                     .muted { color: var(--ui-muted, #aaa); font-size: .8rem; }
                     .upload-side { display: grid; min-width: 0; align-content: start; gap: 1rem; padding: 1.25rem; }
                     .description { margin: 0; color: var(--ui-muted, #aaa); font-size: .875rem; line-height: 1.5; }
-                    .metadata-note { margin: -.5rem 0 0; color: var(--ui-muted, #aaa); font-size: .7rem; line-height: 1.45; }
                     .browse-button, .camera-button, .review-button, .pager button, .remove-button { display: inline-flex; min-height: 2.75rem; align-items: center; justify-content: center; border: 1px solid var(--ui-border, #393939); border-radius: .6rem; background: var(--ui-text, #f6f6f3); color: var(--ui-canvas, #111); padding: .7rem .85rem; font-size: .875rem; font-weight: 650; text-align: center; cursor: pointer; }
                     .browse-button { position: relative; width: 100%; overflow: hidden; border-color: transparent; }
                     .camera-button, .pager button, .remove-button { background: var(--ui-raised, #202020); color: var(--ui-text, #f6f6f3); }
@@ -171,7 +224,10 @@
                     .item { display: grid; grid-template-columns: 3.5rem minmax(0, 1fr) auto; align-items: center; gap: .65rem; padding: .5rem; border: 1px solid var(--ui-border, #393939); border-radius: .6rem; background: var(--ui-canvas, #080808); }
                     .thumb { width: 3.5rem; height: 3.5rem; border-radius: .4rem; object-fit: cover; background: var(--ui-raised, #161616); }
                     .name { overflow-wrap: anywhere; margin: 0; color: var(--ui-text, #f6f6f3); font-size: .875rem; font-weight: 600; }
-                    .meta { overflow-wrap: anywhere; white-space: pre-line; margin: .2rem 0 0; color: var(--ui-muted, #aaa); font-size: .7rem; line-height: 1.45; }
+                    .meta { display: flex; flex-wrap: wrap; align-items: center; gap: .3rem .75rem; overflow-wrap: anywhere; margin: .2rem 0 0; color: var(--ui-muted, #aaa); font-size: .7rem; line-height: 1.45; }
+                    .metadata-item { display: inline-flex; min-width: 0; align-items: center; gap: .25rem; }
+                    .metadata-item svg { width: .9rem; height: .9rem; flex: none; stroke: currentColor; stroke-width: 1.75; fill: none; stroke-linecap: round; stroke-linejoin: round; }
+                    .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; }
                     .remove-button { min-height: 2rem; padding: .4rem .55rem; font-size: .75rem; }
                     .empty { margin: 0; color: var(--ui-muted, #aaa); font-size: .875rem; }
                     .extras, .actions { display: grid; gap: .75rem; }
@@ -181,7 +237,6 @@
                     <div class="drop-side"><div class="dropzone" id="dropzone" role="button" tabindex="0" aria-label="Drop files here or browse files"><span class="drop-icon" aria-hidden="true">↑</span><strong class="drop-title">Drop files here</strong><span class="muted">or choose files from the other panel</span></div></div>
                     <div class="upload-side">
                         <p class="description"></p>
-                        <p class="metadata-note">Date and location come from embedded metadata; uploaded files keep their original metadata.</p>
                         <label class="browse-button">Browse files<input id="file" type="file" aria-label="Browse files"></label>
                         <div class="camera-wrap" hidden><label class="camera-button">Use camera<input class="camera-input" id="camera" type="file" capture="environment" aria-label="Use camera"></label></div>
                         <div class="extras"><slot name="extras"></slot></div>
@@ -307,7 +362,7 @@
                 name.className = 'name'
                 name.textContent = file.name
                 meta.className = 'meta'
-                meta.textContent = `${formatBytes(file.size)} · Reading photo details…`
+                meta.replaceChildren(this.metadataItem('size', 'File size', formatBytes(file.size)))
                 remove.className = 'remove-button'
                 remove.type = 'button'
                 remove.textContent = 'Remove'
@@ -318,10 +373,34 @@
                 this.list.append(row)
                 readMetadata(file).then(({ date, location }) => {
                     if (!row.isConnected) return
-                    const modified = file.lastModified ? new Date(file.lastModified).toLocaleString() : null
-                    meta.textContent = [formatBytes(file.size), date || (modified ? `File modified: ${modified}` : 'Date unavailable'), `Location: ${location || 'unavailable'}`].join(' · ')
+                    const modified = file.lastModified ? new Date(file.lastModified) : null
+                    meta.replaceChildren(this.metadataItem('size', 'File size', formatBytes(file.size)))
+                    if (date) meta.append(this.metadataItem('time', date.label, date.value))
+                    else if (modified && Number.isFinite(modified.getTime())) meta.append(this.metadataItem('time', 'File modified', displayDate(modified)))
+                    if (location) meta.append(this.metadataItem('location', 'Location', location))
                 })
             })
+        }
+
+        metadataItem(iconName, label, value) {
+            const paths = {
+                size: '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/>',
+                time: '<circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/>',
+                location: '<path d="M20 10c0 5-8 12-8 12S4 15 4 10a8 8 0 1 1 16 0Z"/><circle cx="12" cy="10" r="2.5"/>',
+            }
+            const item = document.createElement('span')
+            const icon = document.createElementNS('http://www.w3.org/2000/svg', 'svg')
+            const accessibleLabel = document.createElement('span')
+            const text = document.createElement('span')
+            item.className = 'metadata-item'
+            icon.setAttribute('viewBox', '0 0 24 24')
+            icon.setAttribute('aria-hidden', 'true')
+            icon.innerHTML = paths[iconName]
+            accessibleLabel.className = 'sr-only'
+            accessibleLabel.textContent = `${label}: `
+            text.textContent = value
+            item.append(icon, accessibleLabel, text)
+            return item
         }
     }
 
