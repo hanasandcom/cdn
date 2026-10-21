@@ -233,7 +233,7 @@
                     @media (min-width: 48rem) { .panel { grid-template-columns: minmax(0, 1.05fr) minmax(0, .95fr); } .drop-side { min-height: 26.25rem; border-right: 1px solid var(--ui-border, #393939); border-bottom: 0; padding: 1.5rem; } .dropzone { min-height: 21rem; padding: 2rem; } .upload-side { gap: 1.25rem; padding: 1.5rem; } }
                 </style>
                 <div class="panel">
-                    <div class="drop-side"><div class="dropzone" id="dropzone" role="button" tabindex="0" aria-label="Drop files here or browse files"><span class="drop-icon" aria-hidden="true">↑</span><strong class="drop-title">Drop files here</strong><span class="muted">or choose files from the other panel</span></div></div>
+                    <div class="drop-side"><div class="dropzone" id="dropzone" role="button" tabindex="0" aria-label="Drop files here or browse files"><span class="drop-icon" aria-hidden="true">↑</span><strong class="drop-title">Drop files here</strong><span class="muted">or choose files to upload</span></div></div>
                     <div class="upload-side">
                         <p class="description"></p>
                         <label class="browse-button">Browse files<input id="file" type="file" aria-label="Browse files"></label>

@@ -153,6 +153,8 @@ describe('standalone CDN pages', () => {
         expect(picker).toContain('this.selectedFiles.concat(incoming)')
         expect(picker).not.toContain('No files selected')
         expect(picker).toContain('.drop-side { display: grid; min-height: 11rem;')
+        expect(picker).toContain('or choose files to upload')
+        expect(picker).not.toContain('or choose files from the other panel')
         expect(picker).toContain('.panel { grid-template-columns: minmax(0, 1.05fr) minmax(0, .95fr); }')
         expect(picker).toContain('gpslatitude')
         expect(picker).toContain('datetimeoriginal')
