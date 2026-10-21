@@ -8,6 +8,7 @@ import {
 } from '../src/handlers/index/staticPages.ts'
 import redirectLegacyFile from '../src/handlers/files/redirectLegacy.ts'
 import { fileResponseHeaders } from '../src/utils/fileResponse.ts'
+import { setSessionCookies } from '../src/utils/auth/session.ts'
 
 async function page(handler: typeof getUploadPage, request = {}) {
     let html = ''
@@ -64,6 +65,33 @@ describe('legacy file links', () => {
         await redirectLegacyFile({ params: { id: 'file id' } } as never, reply as never)
         expect(redirect).toEqual({ url: '/api/files/file%20id', statusCode: 308 })
         expect(cacheControl).toBe('no-store')
+    })
+})
+
+describe('CDN session cookies', () => {
+    test('refreshes the shared session expiry on authenticated CDN requests', () => {
+        let cookies: string[] = []
+        const reply = {
+            header: (name: string, value: string[]) => {
+                if (name === 'Set-Cookie') cookies = value
+                return reply
+            },
+        }
+        setSessionCookies({
+            headers: { host: 'cdn.hanasand.com' },
+            protocol: 'https',
+        } as never, reply as never, {
+            id: 'user-1',
+            token: 'session-token',
+            expiresAt: '2026-10-21T20:00:00.000Z',
+        })
+
+        expect(cookies).toHaveLength(3)
+        expect(cookies[0]).toContain('access_token=session-token')
+        expect(cookies[0]).toContain('Domain=.hanasand.com')
+        expect(cookies[0]).toContain('Secure')
+        expect(cookies[0]).toContain('Expires=Wed, 21 Oct 2026 20:00:00 GMT')
+        expect(cookies[1]).toContain('session_expires_at=2026-10-21T20%3A00%3A00.000Z')
     })
 })
 
@@ -126,7 +154,20 @@ describe('standalone CDN pages', () => {
         expect(gallery).toContain('const fileUrl = id => \'/api/files/\' + encodeURIComponent(id)')
         expect(upload).not.toContain('link.href = \'/files/\'')
         expect(gallery).not.toContain('link.href = \'/files/\'')
-        expect(gallery).toContain('.gallery { display: grid;')
+        expect(gallery).toContain('.gallery {')
+        expect(gallery).toContain('justify-content: start;')
+        expect(gallery).toContain('aria-busy="true" class="gallery"')
+        expect(gallery).toContain('class="loading-indicator"')
+        expect(gallery).not.toContain('Loading…')
+        expect(gallery).not.toContain('Your uploaded files and share links.')
+        expect(gallery).not.toContain('aria-label="Hanasand CDN"')
+        expect(gallery).toContain('class="photo-viewer"')
+        expect(gallery).toContain('viewer.showModal()')
+        expect(gallery).toContain('viewerImage.src = url')
+        expect(gallery).toContain('const movePhoto = step =>')
+        const galleryScripts = Array.from(gallery.matchAll(/<script>([\s\S]*?)<\/script>/g))
+        expect(() => new Function(galleryScripts.at(-1)![1])).not.toThrow()
+        expect(login).toContain('main.login-page { width: min(100%, 32rem);')
         expect(gallery).toContain('preview.src = url')
         expect(gallery).toContain('summary.append(preview)')
         expect(gallery).toContain('details.append(summary, info)')

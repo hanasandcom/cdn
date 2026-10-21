@@ -1,9 +1,10 @@
 import type { FastifyReply, FastifyRequest } from 'fastify'
-import { getSessionUserId } from '#utils/auth/session.ts'
+import { getSessionDetails, setSessionCookies } from '#utils/auth/session.ts'
 
 export default async function getSession(req: FastifyRequest, res: FastifyReply) {
     res.header('Cache-Control', 'no-store')
-    const id = await getSessionUserId(req)
-    if (!id) return res.status(401).send({ error: 'Sign in to continue.' })
-    return res.send({ id })
+    const session = await getSessionDetails(req)
+    if (!session) return res.status(401).send({ error: 'Sign in to continue.' })
+    setSessionCookies(req, res, session)
+    return res.send({ id: session.id })
 }

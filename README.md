@@ -24,8 +24,6 @@ Uploads return public share URLs at `https://cdn.hanasand.com/api/files/<file-id
 
 Both `cdn.hanasand.com/upload` and `hanasand.com/upload` use the upload picker in `src/client/upload-picker.js`. The main website loads the public `/assets/upload-picker.js` and `/assets/exifreader.js` assets from this service; its own URL import and publish review remain on Hanasand. This keeps the drop area, browse controls, file list, and photo details consistent while the CDN keeps its own upload and gallery flows.
 
-Both `cdn.hanasand.com/upload` and `hanasand.com/upload` use the upload picker in `src/client/upload-picker.js`. The main website loads the public `/assets/upload-picker.js` and `/assets/exifreader.js` assets from this service; its own URL import and publish review remain on Hanasand. This keeps the drop area, browse controls, file list, and photo details consistent while the CDN keeps its own upload and gallery flows.
-
 ## Development
 
 Use Bun and the dependencies in `package.json`:
