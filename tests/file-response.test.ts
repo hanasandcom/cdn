@@ -59,6 +59,9 @@ describe('standalone CDN pages', () => {
         const { html: gallery, headers: galleryHeaders } = galleryPage
         const { html: login, headers: loginHeaders } = loginPage
 
+        const uploadScripts = Array.from(upload.matchAll(/<script>([\s\S]*?)<\/script>/g))
+        expect(uploadScripts.length).toBeGreaterThan(0)
+        expect(() => new Function(uploadScripts[uploadScripts.length - 1][1])).not.toThrow()
         expect(upload).toContain('fetch(\'/api/files\'')
         expect(upload).toContain('type="file" multiple aria-label="Browse files"')
         expect(upload).toContain('grid-template-columns: minmax(0,1.05fr) minmax(20rem,.95fr)')
@@ -66,6 +69,13 @@ describe('standalone CDN pages', () => {
         expect(upload).toContain('dropzone.addEventListener(\'drop\'')
         expect(upload).toContain('fileInput.files = transfer.files')
         expect(upload).toContain('Browse files')
+        expect(upload).toContain('aria-label="Selected files"')
+        expect(upload).toContain('aria-label="Selected file pages"')
+        expect(upload).toContain('const filesPerPage = 25')
+        expect(upload).toContain('remove.textContent = \'Remove\'')
+        expect(upload).toContain('remove.addEventListener(\'click\'')
+        expect(upload).toContain('Date taken: \' + (date || \'unavailable\')')
+        expect(upload).toContain('formatBytes(file.size)')
         expect(upload).toContain('fetch(\'/api/files/bulk\'')
         expect(upload).toContain('X-CDN-Upload-Count')
         expect(upload).toContain('if (response.status === 401) return null')
