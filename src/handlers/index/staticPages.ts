@@ -20,20 +20,37 @@ const styles = `
 [hidden] { display: none !important; }
 body { margin: 0; min-height: 100vh; padding: 2rem 1rem; display: grid; place-items: center; }
 main { width: min(100%, 58rem); padding: 2rem; border: 1px solid #393939; border-radius: 1rem; background: #101010; }
-main.login-page { width: min(100%, 32rem); padding: 1.5rem; }
+main.login-page { width: min(100%, 24rem); padding: 1.25rem; }
 main.gallery-page { width: min(100%, 96rem); }
 a { color: inherit; }
 header { display: flex; justify-content: space-between; align-items: center; gap: 1rem; }
+main.login-page header { flex-wrap: wrap; }
 h1 { font-size: 2rem; margin: .5rem 0; }
 p { color: #aaa; line-height: 1.5; }
 input, button { font: inherit; border-radius: .6rem; padding: .75rem; }
-input { width: 100%; background: #080808; color: #fff; border: 1px solid #393939; }
+input {
+    appearance: none; width: 100%; background: #080808; color: #f6f6f3;
+    border: 1px solid #393939; caret-color: #f6f6f3;
+}
+input:focus {
+    background: #121212; color: #f6f6f3; border-color: #777;
+}
+input::selection { background: #454545; color: #fff; }
+input:-webkit-autofill, input:-webkit-autofill:hover, input:-webkit-autofill:focus, input:-webkit-autofill:active {
+    -webkit-text-fill-color: #f6f6f3; caret-color: #f6f6f3;
+    -webkit-box-shadow: 0 0 0 1000px #121212 inset; box-shadow: 0 0 0 1000px #121212 inset;
+}
 button { border: 0; background: #f6f6f3; color: #111; font-weight: 600; cursor: pointer; }
 button:disabled { cursor: wait; opacity: .65; }
 button:focus-visible, a:focus-visible, input:focus-visible {
-    outline: 2px solid #fff;
+    outline: 2px solid #999;
     outline-offset: 3px;
 }
+.login-form { display: grid; gap: .5rem; }
+.login-form label { margin-top: .25rem; }
+.login-form label:first-child { margin-top: 0; }
+.login-form input { min-height: 2.75rem; }
+.login-form .actions { margin-top: .35rem; }
 .intro { max-width: 42rem; margin: .5rem 0 1.5rem; }
 .upload-panel { display: grid; gap: .75rem; }
 .upload-actions { display: flex; align-items: center; justify-content: space-between; gap: .75rem; flex-wrap: wrap; }
@@ -114,6 +131,9 @@ hanasand-upload-picker:defined > .picker-fallback { display: none; }
 .viewer-info p { overflow-wrap: anywhere; }
 .viewer-download { display: inline-flex; margin-top: 1rem; }
 @media (max-width: 48rem) {
+    main.login-page { padding: 1rem; }
+    main.login-page header { align-items: flex-start; flex-direction: column; gap: .5rem; }
+    main.login-page header nav { align-self: flex-end; }
     main.gallery-page { padding: 1rem; }
     .photo-viewer { width: 100vw; height: 100dvh; border: 0; border-radius: 0; }
     .viewer-layout { grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1fr) auto; }
