@@ -212,7 +212,7 @@
                     .camera-button:hover, .pager button:not(:disabled):hover, .remove-button:hover { border-color: var(--ui-primary, #f6f6f3); }
                     .review-button { width: 100%; border-color: var(--ui-primary, #f6f6f3); background: var(--ui-primary, #f6f6f3); color: var(--ui-on-primary, #111); }
                     .browse-button:hover, .review-button:hover { opacity: .9; }
-                    :host([disabled]) .browse-button, :host([disabled]) .dropzone { cursor: wait; opacity: .6; }
+                    :host([disabled]) .browse-button, :host([disabled]) .dropzone { cursor: default; }
                     .browse-button input, .camera-input { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; }
                     .camera-button { width: 100%; }
                     .camera-wrap { position: relative; }

@@ -39,6 +39,7 @@ button:focus-visible, a:focus-visible, input:focus-visible {
 .upload-status { overflow-wrap: anywhere; }
 .upload-status img { margin-top: .75rem; border-radius: .5rem; }
 .upload-hint { margin: 1.5rem 0 0; font-size: .75rem; }
+.upload-panel.checking-auth .upload-submit { cursor: default; opacity: 1; }
 .gallery { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 12rem), 1fr)); gap: .75rem; margin-top: 1rem; }
 .file { min-width: 0; overflow: hidden; border: 1px solid #393939; border-radius: .75rem; background: #080808; }
 .file summary { display: block; cursor: pointer; list-style: none; }
@@ -92,7 +93,7 @@ window.cdnAuth = (async () => {
 
 export async function getUploadPage(_req: FastifyRequest, res: FastifyReply) {
     const body = `<p class="intro">Upload images, videos or files.</p>
-<form id="upload" class="upload-panel">
+<form id="upload" class="upload-panel checking-auth">
 <hanasand-upload-picker id="picker" disabled
     description="Choose files to upload, or drag them into the drop area."></hanasand-upload-picker>
 <div class="upload-actions">
@@ -100,7 +101,7 @@ export async function getUploadPage(_req: FastifyRequest, res: FastifyReply) {
 </div>
 </form>
 <p id="status" class="upload-status" role="status" aria-live="polite"></p>
-<p class="upload-hint">Sign in to upload multiple files at once.</p>
+<p id="upload-hint" class="upload-hint" hidden>Sign in to upload multiple files at once.</p>
 <script defer src="/assets/exifreader.js"></script>
 <script defer src="/assets/upload-picker.js"></script>
 ${uploadAuthScript}
@@ -108,13 +109,19 @@ ${uploadAuthScript}
 const form = document.querySelector('#upload')
 const picker = document.querySelector('#picker')
 const status = document.querySelector('#status')
+const hint = document.querySelector('#upload-hint')
 const button = form.querySelector('.upload-submit')
 button.disabled = true
 Promise.all([customElements.whenDefined('hanasand-upload-picker'), window.cdnAuth]).then(([, auth]) => {
     if (auth) picker.setAttribute('multiple', '')
+    else hint.hidden = false
+    form.classList.remove('checking-auth')
     picker.removeAttribute('disabled')
     button.disabled = false
-}).catch(() => { status.textContent = 'Sign-in could not be checked. Reload to try again.' })
+}).catch(() => {
+    form.classList.remove('checking-auth')
+    status.textContent = 'Sign-in could not be checked. Reload to try again.'
+})
 const wait = ms => new Promise(resolve => setTimeout(resolve, ms))
 const addLink = (parent, url, text) => {
     const link = document.createElement('a')
