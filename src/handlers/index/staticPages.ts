@@ -491,6 +491,7 @@ viewer.addEventListener('keydown', event => {
     if (event.key === 'ArrowRight') movePhoto(1)
 })
 const appendFiles = files => {
+    if (!offset) root.replaceChildren()
     for (const file of files) {
         const details = document.createElement('details')
         const summary = document.createElement('summary')

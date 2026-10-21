@@ -187,6 +187,7 @@ describe('standalone CDN pages', () => {
         expect(gallery).toContain('justify-content: start;')
         expect(gallery).toContain('aria-busy="true" class="gallery"')
         expect(gallery).toContain('class="loading-indicator"')
+        expect(gallery).toContain('if (!offset) root.replaceChildren()')
         expect(gallery).not.toContain('Loading…')
         expect(gallery).not.toContain('Your uploaded files and share links.')
         expect(gallery).not.toContain('aria-label="Hanasand CDN"')
