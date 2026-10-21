@@ -41,6 +41,7 @@ export function setSessionCookies(
     const secure = sharedDomain || req.protocol === 'https' ? '; Secure' : ''
     const options = `; Expires=${new Date(session.expiresAt).toUTCString()}; Path=/; SameSite=Lax${sharedDomain}${secure}`
     res.header('Set-Cookie', [
+        `id=${encodeURIComponent(session.id)}${options}`,
         `access_token=${encodeURIComponent(session.token)}${options}`,
         `session_expires_at=${encodeURIComponent(session.expiresAt)}${options}`,
         `auth_checked_at=${encodeURIComponent(new Date().toISOString())}${options}`,

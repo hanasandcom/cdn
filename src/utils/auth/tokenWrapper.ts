@@ -1,5 +1,15 @@
 import config from '#constants'
 
+export class AuthServiceUnavailableError extends Error {
+    readonly statusCode = 503
+    readonly code = 'AUTH_SERVICE_UNAVAILABLE'
+
+    constructor(cause?: unknown) {
+        super('Identity service is unavailable.', { cause })
+        this.name = 'AuthServiceUnavailableError'
+    }
+}
+
 export default async function tokenWrapper(id: string, token: string): Promise<{
     status: boolean
     id: string | null
@@ -23,13 +33,13 @@ export default async function tokenWrapper(id: string, token: string): Promise<{
                 return { status: false, id: null, token: null, expires_at: null }
             }
 
-            throw new Error(await response.text())
+            throw new AuthServiceUnavailableError()
         }
 
         const data = await response.json() as User & { token?: string, expires_at?: string }
         return { status: true, id: data.id, token: data.token || token, expires_at: data.expires_at || null }
     } catch (error) {
-        console.log(error)
-        return { status: false, id: null, token: null, expires_at: null }
+        if (error instanceof AuthServiceUnavailableError) throw error
+        throw new AuthServiceUnavailableError(error)
     }
 }

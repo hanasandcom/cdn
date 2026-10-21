@@ -9,6 +9,7 @@ import {
 import redirectLegacyFile from '../src/handlers/files/redirectLegacy.ts'
 import { fileResponseHeaders } from '../src/utils/fileResponse.ts'
 import { setSessionCookies } from '../src/utils/auth/session.ts'
+import tokenWrapper from '../src/utils/auth/tokenWrapper.ts'
 
 async function page(handler: typeof getUploadPage, request = {}) {
     let html = ''
@@ -86,12 +87,40 @@ describe('CDN session cookies', () => {
             expiresAt: '2026-10-21T20:00:00.000Z',
         })
 
-        expect(cookies).toHaveLength(3)
-        expect(cookies[0]).toContain('access_token=session-token')
+        expect(cookies).toHaveLength(4)
+        expect(cookies[0]).toContain('id=user-1')
         expect(cookies[0]).toContain('Domain=.hanasand.com')
         expect(cookies[0]).toContain('Secure')
         expect(cookies[0]).toContain('Expires=Wed, 21 Oct 2026 20:00:00 GMT')
-        expect(cookies[1]).toContain('session_expires_at=2026-10-21T20%3A00%3A00.000Z')
+        expect(cookies[1]).toContain('access_token=session-token')
+        expect(cookies[2]).toContain('session_expires_at=2026-10-21T20%3A00%3A00.000Z')
+    })
+})
+
+describe('Identity session checks', () => {
+    test('keeps an unavailable Identity API from being treated as a signed-out session', async () => {
+        const originalFetch = globalThis.fetch
+        globalThis.fetch = (async () => new Response('unavailable', { status: 503 })) as typeof fetch
+
+        try {
+            await expect(tokenWrapper('user-1', 'session-token')).rejects.toMatchObject({
+                statusCode: 503,
+                code: 'AUTH_SERVICE_UNAVAILABLE',
+            })
+        } finally {
+            globalThis.fetch = originalFetch
+        }
+    })
+
+    test('treats an invalid Identity token as signed out', async () => {
+        const originalFetch = globalThis.fetch
+        globalThis.fetch = (async () => new Response('invalid', { status: 401 })) as typeof fetch
+
+        try {
+            await expect(tokenWrapper('user-1', 'expired-token')).resolves.toMatchObject({ status: false, id: null })
+        } finally {
+            globalThis.fetch = originalFetch
+        }
     })
 })
 
