@@ -1,6 +1,6 @@
 # Hanasand CDN
 
-Standalone file storage and sharing service for Hanasand. The CDN host serves its own sign-in, upload, and gallery pages. Sign-in and session validation use the Identity API directly; uploads and library requests use this service's API, without depending on the Hanasand website or Hanasand API.
+Standalone file storage and sharing service for Hanasand. The CDN host serves its own sign-in, upload, and gallery pages. Its sign-in page loads the shared username and password fields from Identity; the CDN API forwards sign-in requests to Identity. Uploads and library requests use this service's API, without depending on the Hanasand website or Hanasand API.
 
 ## Run with Docker Compose
 

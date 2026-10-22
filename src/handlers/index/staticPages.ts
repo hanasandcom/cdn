@@ -34,7 +34,7 @@ const styles = `
 [hidden] { display: none !important; }
 body { margin: 0; min-height: 100vh; padding: 2rem 1rem; display: grid; place-items: center; }
 main { width: min(100%, 58rem); padding: 2rem; border: 1px solid #393939; border-radius: 1rem; background: #101010; }
-main.login-page { width: min(100%, 28rem); max-width: 28rem; padding: 1.25rem; }
+main.login-page { width: min(100%, 28rem); max-width: 28rem; padding: 1.5rem; border-radius: 1rem; box-shadow: 0 1.5rem 3rem #0003; }
 body.gallery-body { display: block; padding: 0; background: #1c1c1e; }
 main.gallery-page {
     width: 100%; max-width: none; min-height: 100vh; padding: 0; border: 0;
@@ -71,10 +71,30 @@ button:focus-visible, a:focus-visible, input:focus-visible {
 }
 input:focus-visible { outline-color: #707070; outline-offset: 2px; }
 .login-form { display: grid; gap: 1rem; }
-.login-field { display: grid; gap: 1.25rem; }
-.login-form label { margin: 0; }
-.login-form input { min-height: 2.75rem; }
-.login-form .actions { margin-top: .35rem; }
+.login-form input { min-height: 3rem; border-radius: .55rem; padding: .75rem .85rem; font-size: 1rem; }
+.login-form button { width: 100%; min-height: 3rem; border-radius: .55rem; background: #f6f6f3; color: #111; font-size: .9rem; }
+.signin-card { display: grid; gap: 1.5rem; }
+.signin-brand { display: flex; align-items: center; gap: .75rem; font-size: 1.1rem; }
+.signin-brand img { width: 2.5rem; height: 2.5rem; object-fit: contain; }
+.login-page > header { display: none; }
+.login-page #status:empty { display: none; }
+.login-page #status:not(:empty) {
+    margin: 0; padding: .75rem; border: 1px solid #784747;
+    border-radius: .55rem; background: #281818; color: #f6bcbc;
+}
+.account-actions { display: flex; align-items: center; gap: .6rem; margin-left: auto; }
+.profile-icon {
+    display: grid; width: 2rem; height: 2rem; place-items: center;
+    border: 1px solid #555; border-radius: 50%; background: #202020;
+    color: #eee; font-size: .85rem; font-weight: 700;
+}
+.profile-icon svg { width: 1.1rem; height: 1.1rem; fill: none; stroke: currentColor; stroke-width: 1.7; }
+.sign-out {
+    display: inline-flex; min-height: 2.2rem; align-items: center;
+    padding: .4rem .7rem; border: 1px solid #444; border-radius: .55rem;
+    text-decoration: none; font-size: .82rem;
+}
+.sign-out:hover { background: #3a3a3a; }
 .intro { max-width: 42rem; margin: .5rem 0 1.5rem; }
 .upload-panel { display: grid; gap: .75rem; }
 .upload-actions { display: flex; align-items: center; justify-content: space-between; gap: .75rem; flex-wrap: wrap; }
@@ -158,7 +178,19 @@ hanasand-upload-picker:defined > .picker-fallback { display: none; }
     position: sticky; z-index: 5; top: 0; min-height: 3.5rem; padding: .55rem 1.25rem;
     border-bottom: 1px solid #343436; background: #303033; color: #eee;
 }
-.gallery-page > header nav { margin-left: auto; font-size: .9rem; }
+.gallery-page > header nav { display: flex; align-items: center; gap: .5rem; margin-left: auto; }
+.gallery-nav-link, .density-control {
+    display: inline-flex; min-width: 2.5rem; min-height: 2.5rem; align-items: center;
+    justify-content: center; gap: .45rem; border: 1px solid #48484a; border-radius: .65rem;
+    background: #252527; color: #eee; padding: .45rem .65rem; text-decoration: none;
+}
+.gallery-nav-link:hover, .density-control:hover { background: #3a3a3d; }
+.gallery-nav-link svg, .density-control svg { width: 1.2rem; height: 1.2rem; fill: none; stroke: currentColor; stroke-width: 1.7; }
+.density-control { position: relative; }
+.density-control select {
+    position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer;
+}
+.density-control:focus-within { outline: 2px solid #aaa; outline-offset: 2px; }
 .photo-library-layout { display: grid; grid-template-columns: 16rem minmax(0, 1fr); gap: 0; min-height: calc(100vh - 3.5rem); margin: 0; }
 .public-library { grid-template-columns: minmax(0, 1fr); }
 .library-sidebar {
@@ -199,25 +231,49 @@ hanasand-upload-picker:defined > .picker-fallback { display: none; }
     min-height: 2.4rem; border: 1px solid #3b3b3b; border-radius: .55rem;
     background: #202020; color: #eee; padding: .5rem .7rem; font-size: .82rem;
 }
+#album-target {
+    height: 2.4rem; min-width: 8rem; font: inherit; font-size: .82rem;
+    line-height: 1.2; color-scheme: dark;
+}
+.grid-density-control {
+    display: inline-flex; height: 2.4rem; min-width: 2.4rem; align-items: center;
+    justify-content: center; border: 1px solid #3b3b3b; border-radius: .55rem;
+    background: #202020; color: #eee; position: relative;
+}
+.grid-density-control svg { width: 1.1rem; height: 1.1rem; fill: none; stroke: currentColor; stroke-width: 1.8; }
+.grid-density-control select {
+    position: absolute; inset: 0; width: 100%; min-width: 0; height: 100%;
+    border: 0; opacity: 0; padding: 0; cursor: pointer;
+}
+.grid-density-control:focus-within { outline: 2px solid #aaa; outline-offset: 2px; }
 .library-actions button:disabled { opacity: .5; }
 .photo-group { margin: 1.25rem 0 2rem; }
 .photo-group-heading { display: flex; align-items: baseline; gap: .75rem; margin: 0 0 .75rem; }
 .photo-group-heading h3 { margin: 0; font-size: 1rem; }
 .photo-group-heading span { color: #999; font-size: .85rem; }
 .photo-grid {
-    display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 18rem), 1fr));
+    display: grid; grid-template-columns: repeat(var(--photo-columns, 5), minmax(0, 1fr));
     gap: 1.6rem 2.25rem; align-content: start;
 }
 .library-grid { display: grid; align-content: start; }
 .library-grid[aria-busy="true"] { min-height: 18rem; place-items: center; }
 .library-grid > .loading-indicator { grid-column: 1 / -1; }
-.photo-card { position: relative; min-width: 0; aspect-ratio: 1; overflow: hidden; border-radius: .2rem; background: #171717; }
+.photo-card {
+    position: relative; min-width: 0; aspect-ratio: 1; overflow: hidden;
+    border: 2px solid transparent; border-radius: .55rem; background: #171717;
+    transition: border-color .15s ease, box-shadow .15s ease;
+}
+.photo-card.is-selected { border-color: #70a7ff; box-shadow: 0 0 0 2px #70a7ff55; }
 .photo-card > button:not(.photo-favorite) { display: block; width: 100%; height: 100%; padding: 0; border: 0; background: transparent; }
 .photo-card .preview { width: 100%; height: 100%; aspect-ratio: auto; object-fit: cover; transition: transform .18s ease; }
 .photo-card > button:hover .preview { transform: scale(1.035); }
-.photo-select { position: absolute; top: .45rem; left: .45rem; width: 1.2rem; height: 1.2rem; accent-color: #5e9cff; opacity: 0; }
+.photo-select {
+    position: absolute; z-index: 1; top: .55rem; left: .55rem;
+    width: 1.35rem; height: 1.35rem; accent-color: #5e9cff;
+    opacity: 0; cursor: pointer; filter: drop-shadow(0 1px 3px #000);
+}
 .photo-card:hover .photo-select, .photo-select:focus-visible, .photo-select:checked { opacity: 1; }
-.photo-select:checked { width: 1.25rem; height: 1.25rem; }
+.photo-select:checked { width: 1.45rem; height: 1.45rem; }
 .photo-favorite {
     position: absolute; top: .35rem; right: .35rem; display: grid;
     width: 1.8rem; height: 1.8rem; place-items: center; border: 1px solid #555;
@@ -261,7 +317,7 @@ hanasand-upload-picker:defined > .picker-fallback { display: none; }
     .library-content { padding: .9rem .8rem 2rem; }
     .library-toolbar { align-items: flex-start; flex-direction: column; }
     .library-actions input { width: 100%; }
-    .photo-grid { grid-template-columns: repeat(auto-fill, minmax(6rem, 1fr)); gap: .5rem; }
+    .photo-grid { gap: .5rem; }
     .photo-viewer { width: 100vw; height: 100dvh; border: 0; border-radius: 0; }
     .viewer-layout { grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1fr) auto; }
     .viewer-info { max-height: 30dvh; border-top: 1px solid #393939; border-left: 0; padding: .75rem 1rem; }
@@ -276,9 +332,12 @@ hanasand-upload-picker:defined > .picker-fallback { display: none; }
 }
 `
 
-function shell(title: string, body: string, options: { mainClass?: string, showBrand?: boolean } = {}) {
+function shell(title: string, body: string, options: { mainClass?: string, showBrand?: boolean, account?: string } = {}) {
     const brand = options.showBrand === false ? '' : '<a href="/" aria-label="Hanasand CDN">Hanasand CDN</a>'
     const bodyClass = options.mainClass === 'gallery-page' ? 'gallery-body' : ''
+    const loginScript = options.mainClass === 'login-page'
+        ? '<script src="https://api.hanasand.com/api/auth/login-form.js" defer></script>'
+        : ''
     return `<!doctype html>
 <html lang="en">
 <meta charset="utf-8">
@@ -286,15 +345,32 @@ function shell(title: string, body: string, options: { mainClass?: string, showB
 <title>${title} · Hanasand CDN</title>
 <script src="https://api.hanasand.com/api/auth/device-proof-client.js"></script>
 <style>${styles}</style>
+${loginScript}
 <body class="${bodyClass}">
 <main class="${options.mainClass || ''}">
 <header>${brand}
-<nav><a href="/gallery">Gallery</a> · <a href="/upload">Upload</a></nav></header>
+<nav>
+<a class="gallery-nav-link" href="/gallery" aria-label="Gallery" title="Gallery">
+<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="8" height="8" rx="1"/>
+<rect x="13" y="3" width="8" height="8" rx="1"/><rect x="3" y="13" width="8" height="8" rx="1"/>
+<rect x="13" y="13" width="8" height="8" rx="1"/></svg></a>
+<a class="gallery-nav-link" href="/upload" aria-label="Upload" title="Upload">
+<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 16V4m0 0L7 9m5-5 5 5"/>
+<path d="M5 14v5a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-5"/></svg></a>
+</nav>${options.account || ''}</header>
 <h1>${title}</h1>
 ${body}
 </main>
 </body>
 </html>`
+}
+
+function accountActions() {
+    return `<div class="account-actions">
+<span class="profile-icon" aria-label="Profile"><svg viewBox="0 0 24 24" aria-hidden="true">
+<circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg></span>
+<a class="sign-out" href="/logout">Sign out</a>
+</div>`
 }
 
 function uploadAuthScript() {
@@ -323,6 +399,7 @@ export async function getUploadPage(req: FastifyRequest, res: FastifyReply) {
     const session = await getSessionDetails(req)
     const userId = session?.id || null
     if (session) setSessionCookies(req, res, session)
+    const account = session ? accountActions() : ''
     const guestHint = userId ? '' : '<p id="upload-hint" class="upload-hint">Sign in to upload multiple files at once.</p>'
     const body = `<p class="intro">Upload images, videos or files.</p>
 <form id="upload" class="upload-panel">
@@ -518,37 +595,28 @@ form.addEventListener('submit', async event => {
     }
 })
 </script>`
-    return res.header('Cache-Control', 'private, no-store').type('text/html').send(shell('Upload media', body))
+    return res.header('Cache-Control', 'private, no-store').type('text/html').send(shell('Upload media', body, { account }))
 }
 
 export async function getLoginPage(_req: FastifyRequest, res: FastifyReply) {
     const body = `<form id="login" class="login-form">
-<div class="login-field">
-<label for="username">Username</label>
-<input id="username" name="username" autocomplete="username" required>
-</div>
-<div class="login-field">
-<label for="password">Password</label>
-<input id="password" name="password" type="password" autocomplete="current-password" required>
-</div>
-<div class="actions"><button id="submit">Sign in</button></div>
+<hanasand-login-form></hanasand-login-form>
 </form>
-<p id="status" role="status" aria-live="polite"></p>
 <script>
 const form = document.querySelector('#login')
-const status = document.querySelector('#status')
+const loginForm = document.querySelector('hanasand-login-form')
 form.addEventListener('submit', async event => {
     event.preventDefault()
-    const button = document.querySelector('#submit')
-    button.disabled = true
-    status.textContent = 'Signing in…'
+    loginForm.setBusy(true)
+    loginForm.setError('')
     try {
+        const fields = new FormData(form)
         const response = await fetch('/api/auth/login', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-                username: form.elements.username.value,
-                password: form.elements.password.value,
+                username: fields.get('username'),
+                password: fields.get('password'),
             }),
         })
         const result = await response.json()
@@ -556,8 +624,8 @@ form.addEventListener('submit', async event => {
         const target = new URLSearchParams(location.search).get('returnTo') || '/gallery'
         location.replace(target.startsWith('/') && !target.startsWith('//') ? target : '/gallery')
     } catch (error) {
-        status.textContent = error.message || 'Sign-in failed. Please try again.'
-        button.disabled = false
+        loginForm.setError(error.message || 'Sign-in failed. Please try again.')
+        loginForm.setBusy(false)
     }
 })
 </script>`
@@ -565,6 +633,9 @@ form.addEventListener('submit', async event => {
 }
 
 export async function getGalleryPage(_req: FastifyRequest, res: FastifyReply) {
+    const session = await getSessionDetails(_req)
+    if (session) setSessionCookies(_req, res, session)
+    const account = session ? accountActions() : ''
     const body = `<div id="photo-library" class="photo-library-layout" aria-busy="true">
 <aside class="library-sidebar" aria-label="Photo library">
 <div class="library-section"><h2>Library</h2>
@@ -581,6 +652,14 @@ export async function getGalleryPage(_req: FastifyRequest, res: FastifyReply) {
 <section class="library-content" aria-label="Photos">
 <div class="library-toolbar"><h2 id="view-title">Library</h2><div class="library-actions">
 <input id="photo-search" type="search" placeholder="Search photos" aria-label="Search photos" autocomplete="off">
+<label class="grid-density-control" title="Images per row">
+<svg viewBox="0 0 24 24" aria-hidden="true">
+<rect x="3" y="3" width="8" height="8" rx="1"/><rect x="13" y="3" width="8" height="8" rx="1"/>
+<rect x="3" y="13" width="8" height="8" rx="1"/><rect x="13" y="13" width="8" height="8" rx="1"/></svg>
+<select id="grid-density" aria-label="Images per row">
+<option value="1">1 per row</option><option value="3">3 per row</option>
+<option value="5" selected>5 per row</option></select>
+</label>
 <span id="selection-count" class="muted" hidden></span>
 <select id="album-target" aria-label="Choose an album"><option value="">Add to album</option></select>
 <button id="add-to-album" type="button" disabled>Add selected</button>
@@ -609,7 +688,10 @@ window.cdnAuth = fetch('/api/auth/session', { cache: 'no-store', credentials: 's
 </script>
 <script src="/assets/gallery.js" defer></script>`
     return res.header('Cache-Control', 'private, no-store').type('text/html').send(
-        shell('Library', body, { mainClass: 'gallery-page', showBrand: false }),
+        shell('Library', body, {
+            mainClass: 'gallery-page', showBrand: false,
+            account,
+        }),
     )
 }
 

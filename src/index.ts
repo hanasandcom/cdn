@@ -16,6 +16,7 @@ import {
 } from './handlers/index/staticPages.ts'
 import login from './handlers/auth/login.ts'
 import getSession from './handlers/auth/session.ts'
+import logout from './handlers/auth/logout.ts'
 import redirectLegacyFile from './handlers/files/redirectLegacy.ts'
 import getRobotsTxt from './handlers/index/getRobotsTxt.ts'
 import websocketPlugin from '@fastify/websocket'
@@ -82,6 +83,7 @@ fastify.get('/shared/:token', getSharedAlbumPage)
 fastify.get('/login', getLoginPage)
 fastify.post('/api/auth/login', login)
 fastify.get('/api/auth/session', getSession)
+fastify.get('/logout', logout)
 fastify.get('/files/:id', redirectLegacyFile)
 fastify.get('/health', health)
 fastify.get('/robots.txt', getRobotsTxt)

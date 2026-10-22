@@ -1,4 +1,4 @@
-/* global window, document, location, navigator, fetch, Option, URLSearchParams, clearTimeout, setTimeout */
+/* global window, document, location, navigator, fetch, Option, URLSearchParams, clearTimeout, setTimeout, localStorage */
 (() => {
     const page = document.querySelector('#photo-library')
     if (!page) return
@@ -18,8 +18,17 @@
     const viewerCount = document.querySelector('#viewer-count')
     const dialog = document.querySelector('#album-form')
     const searchInput = document.querySelector('#photo-search')
+    const densitySelect = document.querySelector('#grid-density')
     const publicToken = page.dataset.publicToken || ''
     const isPublic = Boolean(publicToken)
+    const setGridDensity = value => {
+        const density = ['1', '3', '5'].includes(value) ? value : '3'
+        root?.style.setProperty('--photo-columns', density)
+        if (densitySelect) densitySelect.value = density
+        try { localStorage.setItem('cdn-gallery-density', density) } catch { /* Storage may be disabled. */ }
+    }
+    try { setGridDensity(localStorage.getItem('cdn-gallery-density') || '5') } catch { setGridDensity('5') }
+    densitySelect?.addEventListener('change', () => setGridDensity(densitySelect.value))
     const state = {
         files: [], allFiles: [], recentFiles: [], albums: [], activeAlbum: null,
         view: 'library', selected: new Set(), offset: 0, recentOffset: 0,
@@ -383,11 +392,13 @@
                     checkbox.type = 'checkbox'
                     checkbox.className = 'photo-select'
                     checkbox.checked = state.selected.has(file.id)
+                    card.classList.toggle('is-selected', checkbox.checked)
                     checkbox.setAttribute('aria-label', `Select ${file.name}`)
                     checkbox.addEventListener('click', event => event.stopPropagation())
                     checkbox.addEventListener('change', () => {
                         if (checkbox.checked) state.selected.add(file.id)
                         else state.selected.delete(file.id)
+                        card.classList.toggle('is-selected', checkbox.checked)
                         updateSelection()
                     })
                     card.append(checkbox)
