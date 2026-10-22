@@ -11,7 +11,6 @@ import redirectLegacyFile from '../src/handlers/files/redirectLegacy.ts'
 import { fileResponseHeaders } from '../src/utils/fileResponse.ts'
 import { setSessionCookies } from '../src/utils/auth/session.ts'
 import tokenWrapper from '../src/utils/auth/tokenWrapper.ts'
-import getTargetRouteGroup from '../src/utils/rateLimit/getTargetRouteGroup.ts'
 
 async function page(handler: typeof getUploadPage, request = {}) {
     let html = ''
@@ -126,126 +125,6 @@ describe('Identity session checks', () => {
     })
 })
 
-describe('shared login package assets', () => {
-    test('groups only the same-origin package assets under public read limits', () => {
-        expect(getTargetRouteGroup('/assets/login-form.js')).toBe('/assets/login-form.js')
-        expect(getTargetRouteGroup('/assets/login-form.css')).toBe('/assets/login-form.css')
-        expect(getTargetRouteGroup('/assets/login-form.js/extra')).toBeNull()
-        expect(getTargetRouteGroup('/api/auth/login-form.js')).toBeNull()
-    })
-
-    test('serves the installed package module and stylesheet locally with safe headers', async () => {
-        const { createLoginAssetHandlers } = await import('../src/handlers/auth/loginAssets.ts')
-        const loaded: string[] = []
-        const headers: Record<string, string> = {}
-        const bodies: string[] = []
-        const reply = {
-            header: (name: string, value: string) => { headers[name] = value; return reply },
-            type: (value: string) => { headers['Content-Type'] = value; return reply },
-            send: (value: string) => { bodies.push(value); return reply },
-        }
-        const handlers = createLoginAssetHandlers(async specifier => {
-            loaded.push(specifier)
-            return specifier === 'hanasand/auth'
-                ? 'export function registerHanasandLoginForm() {}'
-                : '.hanasand-login-form { display: block; }'
-        })
-
-        await handlers.getScript({} as never, reply as never)
-        expect(bodies[0]).toContain('export function registerHanasandLoginForm() {}')
-        expect(bodies[0]).toContain('registerHanasandLoginForm();')
-        expect(headers['Cache-Control']).toBe('no-store')
-        expect(headers['X-Content-Type-Options']).toBe('nosniff')
-        expect(headers['Content-Type']).toBe('text/javascript; charset=utf-8')
-
-        await handlers.getStyles({} as never, reply as never)
-        expect(bodies[1]).toBe('.hanasand-login-form { display: block; }')
-        expect(headers['Content-Type']).toBe('text/css; charset=utf-8')
-        expect(loaded).toEqual(['hanasand/auth', 'hanasand/auth.css'])
-    })
-
-    test('resolves the browser form module and stylesheet from the installed package', async () => {
-        const { createLoginAssetHandlers } = await import('../src/handlers/auth/loginAssets.ts')
-        const bodies: string[] = []
-        const reply = {
-            header: () => reply,
-            type: () => reply,
-            send: (value: string) => { bodies.push(value); return reply },
-        }
-        const handlers = createLoginAssetHandlers()
-
-        await handlers.getScript({} as never, reply as never)
-        await handlers.getStyles({} as never, reply as never)
-
-        expect(bodies[0]).toContain('export function registerHanasandLoginForm()')
-        expect(bodies[0]).toContain('registerHanasandLoginForm();')
-        expect(bodies[0]).toContain('Email or username')
-        expect(bodies[0]).toContain('Password')
-        expect(bodies[0]).toContain('Sign in with passkey')
-        expect(bodies[0]).toContain('Continue with Google')
-        expect(bodies[0]).toContain('document.querySelector(\'#cdn-login-form\')')
-        expect(bodies[0]).toContain('new FormData(cdnLoginForm)')
-        expect(bodies[0]).toContain('fetch(cdnLoginForm.action')
-        expect(() => new Function(bodies[0].slice(bodies[0].indexOf('const cdnLoginForm')))).not.toThrow()
-        expect(bodies[1]).toContain('hanasand-login-form')
-    })
-
-    test('submits the shared login fields to CDN and navigates after success', async () => {
-        const { createLoginAssetHandlers } = await import('../src/handlers/auth/loginAssets.ts')
-        const bodies: string[] = []
-        const reply = {
-            header: () => reply,
-            type: () => reply,
-            send: (value: string) => { bodies.push(value); return reply },
-        }
-        await createLoginAssetHandlers().getScript({} as never, reply as never)
-
-        let onSubmit: ((event: { preventDefault(): void }) => Promise<void>) | undefined
-        const busy: boolean[] = []
-        const errors: string[] = []
-        const component = {
-            setBusy: (value: boolean) => busy.push(value),
-            setError: (value: string) => errors.push(value),
-            getAttribute: () => '/gallery',
-        }
-        const form = {
-            action: '/api/auth/login',
-            addEventListener: (type: string, handler: typeof onSubmit) => {
-                expect(type).toBe('submit')
-                onSubmit = handler
-            },
-            querySelector: () => component,
-        }
-        const fields = { username: 'eirik', password: 'secret' }
-        class LoginFormData {
-            constructor() {}
-            get(name: keyof typeof fields) { return fields[name] }
-        }
-        let request: { url: string, init: RequestInit } | undefined
-        let destination = ''
-        const handlerScript = bodies[0].slice(bodies[0].indexOf('const cdnLoginForm'))
-        const submit = new Function('document', 'FormData', 'fetch', 'window', handlerScript) as (...args: unknown[]) => void
-        submit(
-            { querySelector: () => form },
-            LoginFormData,
-            async (url: string, init: RequestInit) => {
-                request = { url, init }
-                return { ok: true, json: async () => ({ id: 'user-1' }) }
-            },
-            { location: { assign: (value: string) => { destination = value } } },
-        )
-
-        expect(onSubmit).toBeDefined()
-        await onSubmit!({ preventDefault() {} })
-        expect(request?.url).toBe('/api/auth/login')
-        expect(JSON.parse(String(request?.init.body))).toEqual(fields)
-        expect(request?.init.credentials).toBe('same-origin')
-        expect(destination).toBe('/gallery')
-        expect(busy).toEqual([true, false])
-        expect(errors).toEqual([''])
-    })
-})
-
 describe('standalone CDN pages', () => {
     test('renders the guest state and picker fallback in the initial upload HTML', async () => {
         const { html } = await page(getUploadPage)
@@ -329,18 +208,13 @@ describe('standalone CDN pages', () => {
         expect(() => new Function(galleryClient)).not.toThrow()
         expect(login).toContain('main.login-page { width: min(100%, 28rem); max-width: 28rem;')
         expect(login).not.toContain('Sign in to your Hanasand account to upload files and view your library.')
-        expect(login).toContain('<link rel="stylesheet" href="/assets/login-form.css">')
-        expect(login).toContain('<script type="module" src="/assets/login-form.js"></script>')
+        expect(login).toContain('<link rel="stylesheet" href="/assets/login-form.css"><script src="/assets/login-form.js" defer></script>')
         expect(login).not.toContain('/api/auth/device-proof-client.js')
-        expect(login).not.toContain('/api/auth/login-form.js')
-        expect(login).not.toContain('identity.hanasand.com/api/auth/login-form.js')
-        expect(login).not.toContain('api.hanasand.com/api/auth/login-form.js')
-        expect(login).toContain('<form id="cdn-login-form" action="/api/auth/login" method="post">')
-        expect(login).toContain('<hanasand-login-form')
-        expect(login).not.toContain('login-url=')
+        expect(login).not.toContain('api/auth/login-form.js')
+        expect(login).toContain('<hanasand-login-form login-url="/api/auth/login"')
         expect(login).toContain('passkey-options-url="/api/auth/passkeys/authenticate/options"')
         expect(login).toContain('passkey-verify-url="/api/auth/passkeys/authenticate/verify"')
-        expect(login).toContain('sso-href="/api/auth/sso/start?redirectPath=%2Fgallery"')
+        expect(login).toContain('sso-href="/api/auth/sso/start"')
         expect(login).toContain('redirect-path="/gallery"')
         expect(login).toContain('input:focus, input:focus-visible {')
         expect(login).toContain('background-color: #080808; color: #f6f6f3; border-color: #707070;')
@@ -358,6 +232,7 @@ describe('standalone CDN pages', () => {
         expect(galleryClient).toContain('location.replace(\'/login?returnTo=\'')
         expect(upload).not.toContain('https://hanasand.com/upload')
         expect(gallery).not.toContain('https://hanasand.com/gallery')
+        expect(login).not.toContain('new FormData(form)')
         expect(login).not.toContain('hanasand.com/login')
         expect(uploadHeaders['Cache-Control']).toBe('private, no-store')
         expect(galleryHeaders['Cache-Control']).toBe('private, no-store')
@@ -367,11 +242,11 @@ describe('standalone CDN pages', () => {
     test('keeps login return paths on CDN and escapes markup', async () => {
         const { html } = await page(getLoginPage, { query: { returnTo: '/gallery?sort=date&view=images' } })
         expect(html).toContain('redirect-path="/gallery?sort=date&amp;view=images"')
-        expect(html).toContain('sso-href="/api/auth/sso/start?redirectPath=%2Fgallery%3Fsort%3Ddate%26view%3Dimages"')
+        expect(html).toContain('sso-href="/api/auth/sso/start"')
 
         const { html: unsafe } = await page(getLoginPage, { query: { returnTo: '//attacker.example/path' } })
         expect(unsafe).toContain('redirect-path="/gallery"')
-        expect(unsafe).toContain('sso-href="/api/auth/sso/start?redirectPath=%2Fgallery"')
+        expect(unsafe).toContain('sso-href="/api/auth/sso/start"')
     })
 
     test('serves the shared picker and image metadata assets', async () => {

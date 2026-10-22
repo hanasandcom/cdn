@@ -8,19 +8,20 @@ import {
     getExifReaderScript,
     getGalleryPage,
     getGalleryClientScript,
+    getAuthClientScript,
+    getAuthClientStylesheet,
     getLoginPage,
     getUploadPage,
     getUploadPickerScript,
     getSharedAlbumPage,
 } from './handlers/index/staticPages.ts'
 import login from './handlers/auth/login.ts'
-import { getLoginFormScript, getLoginFormStyles } from './handlers/auth/loginAssets.ts'
+import startSso from './handlers/auth/ssoStart.ts'
 import {
     getPasskeyOptions,
     getSocialProviders,
     postPasskeyVerify,
     postSocialStart,
-    getSsoStart,
     postSsoStart,
 } from './handlers/auth/identityFlow.ts'
 import getSession from './handlers/auth/session.ts'
@@ -89,13 +90,13 @@ fastify.get('/gallery', getGalleryPage)
 fastify.get('/shared/:token', getSharedAlbumPage)
 fastify.get('/login', getLoginPage)
 fastify.post('/api/auth/login', login)
-fastify.get('/assets/login-form.js', getLoginFormScript)
-fastify.get('/assets/login-form.css', getLoginFormStyles)
+fastify.get('/api/auth/sso/start', startSso)
+fastify.get('/assets/login-form.js', getAuthClientScript)
+fastify.get('/assets/login-form.css', getAuthClientStylesheet)
 fastify.get('/api/auth/passkeys/authenticate/options', getPasskeyOptions)
 fastify.post('/api/auth/passkeys/authenticate/verify', postPasskeyVerify)
 fastify.get('/api/auth/social/providers', getSocialProviders)
 fastify.post('/api/auth/social/:provider/start', postSocialStart)
-fastify.get('/api/auth/sso/start', getSsoStart)
 fastify.post('/api/auth/sso/start', postSsoStart)
 fastify.get('/api/auth/session', getSession)
 fastify.get('/logout', logout)

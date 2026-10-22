@@ -20,6 +20,7 @@ RUN chmod +x /usr/src/app/entrypoint.sh
 
 # Installs required dependencies
 RUN bun install
+RUN bun run build:auth-client
 
 # Expose API port
 EXPOSE 8080

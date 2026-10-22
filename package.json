@@ -8,6 +8,7 @@
   "main": "src/index.ts",
   "scripts": {
     "start": "bun src/index.ts",
+    "build:auth-client": "bun build src/client/auth.ts --outdir dist/client --target browser",
     "lint": "eslint --fix ./src",
     "test:e2e": "bun scripts/run-playwright-status.ts",
     "test:e2e:traffic": "bun scripts/run-playwright-status.ts tests/traffic.spec.ts",

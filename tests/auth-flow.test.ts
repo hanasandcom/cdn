@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, test } from 'bun:test'
-import { getPasskeyOptions, getSsoStart, postPasskeyVerify, postSocialStart, postSsoStart } from '../src/handlers/auth/identityFlow.ts'
+import { getPasskeyOptions, postPasskeyVerify, postSocialStart, postSsoStart } from '../src/handlers/auth/identityFlow.ts'
+import startSso from '../src/handlers/auth/ssoStart.ts'
 import getTargetRouteGroup from '../src/utils/rateLimit/getTargetRouteGroup.ts'
 
 const originalFetch = globalThis.fetch
@@ -35,6 +36,7 @@ function reply() {
         header(name: string, value: string | string[]) { headers[name] = value; return result },
         status(value: number) { statusCode = value; return result },
         code(value: number) { statusCode = value; return result },
+        redirect(url: string, code: number) { statusCode = code; headers.Location = url; return result },
         send(value: unknown) { payload = value; return result },
     }
     return result
@@ -159,25 +161,33 @@ describe('CDN Identity login proxies', () => {
         expect(String(res.headers['Set-Cookie'])).toContain('; HttpOnly; Secure; Domain=.hanasand.com')
     })
 
-    test('matches Hanasand SSO GET flow with a same-site Identity callback and CDN return URL', async () => {
-        let sent: Record<string, unknown> | undefined
-        globalThis.fetch = (async (_input, init) => {
-            sent = JSON.parse(String(init?.body))
-            return Response.json({ url: 'https://idp.example.test/authorize' })
-        }) as typeof fetch
+    test('starts Google sign-in through the canonical Hanasand callback with a fixed CDN return URL', async () => {
         const res = reply()
 
-        await getSsoStart(request({
+        await startSso(request({
             method: 'GET',
             headers: { host: 'cdn.hanasand.com', 'user-agent': 'test-browser' },
-            query: { redirectPath: '/gallery?sort=date' },
         }) as never, res as never)
 
-        expect(sent?.redirectPath).toBe('https://cdn.hanasand.com/gallery?sort=date')
-        expect(sent?.binding).toMatch(/^[A-Za-z0-9_-]{43}$/)
+        const target = new URL(String(res.headers.Location))
+        expect(target.origin).toBe('https://hanasand.com')
+        expect(target.pathname).toBe('/api/auth/sso/start')
+        expect(target.searchParams.get('returnTo')).toBe('https://cdn.hanasand.com/')
         expect(res.statusCode).toBe(303)
-        expect(res.headers.Location).toBe('https://idp.example.test/authorize')
-        expect(String(res.headers['Set-Cookie'])).toContain('; SameSite=None; HttpOnly; Secure; Domain=.hanasand.com')
+        expect(res.headers['Cache-Control']).toBe('no-store')
+        expect(res.headers['Referrer-Policy']).toBe('no-referrer')
+    })
+
+    test('rejects insecure and untrusted CDN SSO start requests', async () => {
+        for (const values of [
+            { headers: { host: 'cdn.hanasand.com' }, protocol: 'http' },
+            { headers: { host: 'cdn.hanasand.com.attacker.test' }, protocol: 'https' },
+        ]) {
+            const res = reply()
+            await startSso(request(values) as never, res as never)
+            expect(res.statusCode).toBe(400)
+            expect(res.headers.Location).toBeUndefined()
+        }
     })
 
     test('puts all sign-in API paths under route rate limits', () => {

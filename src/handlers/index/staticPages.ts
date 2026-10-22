@@ -5,6 +5,8 @@ import { getSessionDetails, setSessionCookies } from '#utils/auth/session.ts'
 const uploadPickerPath = new URL('../../client/upload-picker.js', import.meta.url)
 const galleryClientPath = new URL('../../client/gallery.js', import.meta.url)
 const exifReaderPath = new URL('../../../node_modules/exifreader/dist/exif-reader.js', import.meta.url)
+const authClientScriptPath = new URL('../../../dist/client/auth.js', import.meta.url)
+const authClientStylesheetPath = new URL('../../../dist/client/auth.css', import.meta.url)
 export async function getUploadPickerScript(_req: FastifyRequest, res: FastifyReply) {
     const script = await readFile(uploadPickerPath)
     return res.header('Cache-Control', 'no-store').type('text/javascript').send(script)
@@ -16,6 +18,14 @@ export async function getExifReaderScript(_req: FastifyRequest, res: FastifyRepl
 
 export async function getGalleryClientScript(_req: FastifyRequest, res: FastifyReply) {
     return res.header('Cache-Control', 'no-store').type('text/javascript').send(await readFile(galleryClientPath))
+}
+
+export async function getAuthClientScript(_req: FastifyRequest, res: FastifyReply) {
+    return res.header('Cache-Control', 'no-store').type('text/javascript').send(await readFile(authClientScriptPath))
+}
+
+export async function getAuthClientStylesheet(_req: FastifyRequest, res: FastifyReply) {
+    return res.header('Cache-Control', 'no-store').type('text/css').send(await readFile(authClientStylesheetPath))
 }
 
 const styles = `
@@ -342,8 +352,8 @@ hanasand-upload-picker:defined > .picker-fallback { display: none; }
 function shell(title: string, body: string, options: { mainClass?: string, showBrand?: boolean, account?: string } = {}) {
     const brand = options.showBrand === false ? '' : '<a href="/" aria-label="Hanasand CDN">Hanasand CDN</a>'
     const bodyClass = options.mainClass === 'gallery-page' ? 'gallery-body' : ''
-    const loginScript = options.mainClass === 'login-page'
-        ? '<link rel="stylesheet" href="/assets/login-form.css"><script type="module" src="/assets/login-form.js"></script>'
+    const loginAssets = options.mainClass === 'login-page'
+        ? '<link rel="stylesheet" href="/assets/login-form.css"><script src="/assets/login-form.js" defer></script>'
         : ''
     return `<!doctype html>
 <html lang="en">
@@ -351,7 +361,7 @@ function shell(title: string, body: string, options: { mainClass?: string, showB
 <meta name="viewport" content="width=device-width">
 <title>${title} · Hanasand CDN</title>
 <style>${styles}</style>
-${loginScript}
+${loginAssets}
 <body class="${bodyClass}">
 <main class="${options.mainClass || ''}">
 <header>${brand}
@@ -607,13 +617,11 @@ form.addEventListener('submit', async event => {
 export async function getLoginPage(req: FastifyRequest, res: FastifyReply) {
     const query = req.query as { returnTo?: unknown } | undefined
     const redirectPath = safeCdnReturnPath(query?.returnTo)
-    const ssoHref = `/api/auth/sso/start?redirectPath=${encodeURIComponent(redirectPath)}`
-    const body = `<form id="cdn-login-form" action="/api/auth/login" method="post">
-<hanasand-login-form
+    const ssoHref = '/api/auth/sso/start'
+    const body = `<hanasand-login-form login-url="/api/auth/login"
 passkey-options-url="/api/auth/passkeys/authenticate/options"
 passkey-verify-url="/api/auth/passkeys/authenticate/verify"
-sso-href="${escapeHtmlAttribute(ssoHref)}" redirect-path="${escapeHtmlAttribute(redirectPath)}"></hanasand-login-form>
-</form>`
+sso-href="${escapeHtmlAttribute(ssoHref)}" redirect-path="${escapeHtmlAttribute(redirectPath)}"></hanasand-login-form>`
     return res.header('Cache-Control', 'private, no-store').type('text/html').send(shell('Sign in', body, { mainClass: 'login-page' }))
 }
 

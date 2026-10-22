@@ -1,6 +1,6 @@
 # Hanasand CDN
 
-Standalone file storage and sharing service for Hanasand. The CDN host serves its own sign-in, upload, and gallery pages. Its sign-in form is bundled from the shared `hanasand` npm package and served from same-origin CDN endpoints; sign-in requests go from the CDN API directly to Identity. Uploads and library requests use this service's API, without depending on the Hanasand website or public Hanasand API.
+Standalone file storage and sharing service for Hanasand. The CDN host serves its own sign-in, upload, and gallery pages. Shared Identity client scripts are fetched over the private Identity network and served from same-origin CDN endpoints; sign-in requests also go from the CDN API directly to Identity. Uploads and library requests use this service's API, without depending on the Hanasand website or public Hanasand API.
 
 ## Run with Docker Compose
 
@@ -22,7 +22,7 @@ The CDN API is published on port `8501` and its database on `8502`. Do not expos
 
 Uploads return public share URLs at `https://cdn.hanasand.com/api/files/<file-id>`. Guests can select and upload one file at a time. Signed-in users can select multiple files, and the upload page sends batches of up to 5,000 files and 45 MiB to `POST /api/files/bulk` (the `X-CDN-Upload-Count` header must match the multipart file count). The smaller request-size cap leaves room under the CDN host's 50 MiB proxy limit for multipart headers. The gallery loads 100 files at a time, sorted by photo date when available, so large libraries do not require one enormous response. Browser-supported image and video types render inline. Session checks use the Hanasand Identity API. The legacy `/files/<file-id>` address redirects to the canonical API URL. Gallery, upload, and sign-in pages bypass Varnish caching so released UI changes appear immediately.
 
-Both `cdn.hanasand.com/upload` and `hanasand.com/upload` use the upload picker in `src/client/upload-picker.js`. The main website loads the public `/assets/upload-picker.js` and `/assets/exifreader.js` assets from this service; its own URL import and publish review remain on Hanasand. This keeps the drop area, browse controls, file list, and photo details consistent while the CDN keeps its own upload and gallery flows. The CDN login page bundles the shared browser form from `hanasand/auth` and its stylesheet from `hanasand/auth.css`, then serves both as same-origin assets. Its password, passkey, and SSO URLs point to CDN same-origin routes. Those routes call Identity over the private network, set shared session cookies after successful password or passkey verification, and bind SSO callbacks to a short-lived, secure browser cookie before returning to CDN. The browser does not depend on the Hanasand website or public API for sign-in.
+Both `cdn.hanasand.com/upload` and `hanasand.com/upload` use the upload picker in `src/client/upload-picker.js`. The main website loads the public `/assets/upload-picker.js` and `/assets/exifreader.js` assets from this service; its own URL import and publish review remain on Hanasand. This keeps the drop area, browse controls, file list, and photo details consistent while the CDN keeps its own upload and gallery flows. The CDN login page registers the shared `hanasand-login-form` browser component from the published `hanasand` package; `bun run build:auth-client` bundles its browser entry and stylesheet into CDN-local assets. Password, passkey, and Google SSO actions use same-origin CDN routes. Password and passkey routes call Identity over the private network and set shared session cookies; Google sign-in starts at Hanasand's canonical callback and returns to the fixed CDN origin. The browser does not depend on a public Identity or Hanasand API asset for sign-in.
 
 ## Photo library
 
@@ -38,6 +38,7 @@ Use Bun and the dependencies in `package.json`:
 
 ```sh
 bun install
+bun run build:auth-client
 bun run start
 ```
 
