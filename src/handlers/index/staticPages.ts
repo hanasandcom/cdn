@@ -353,7 +353,7 @@ function shell(title: string, body: string, options: { mainClass?: string, showB
     const brand = options.showBrand === false ? '' : '<a href="/" aria-label="Hanasand CDN">Hanasand CDN</a>'
     const bodyClass = options.mainClass === 'gallery-page' ? 'gallery-body' : ''
     const loginScript = options.mainClass === 'login-page'
-        ? '<script src="https://api.hanasand.com/api/auth/login-form.js" defer></script>'
+        ? '<script src="https://identity.hanasand.com/api/auth/login-form.js" defer></script>'
         : ''
     return `<!doctype html>
 <html lang="en">

@@ -208,7 +208,7 @@ describe('standalone CDN pages', () => {
         expect(() => new Function(galleryClient)).not.toThrow()
         expect(login).toContain('main.login-page { width: min(100%, 28rem); max-width: 28rem;')
         expect(login).not.toContain('Sign in to your Hanasand account to upload files and view your library.')
-        expect(login).toContain('api.hanasand.com/api/auth/login-form.js')
+        expect(login).toContain('identity.hanasand.com/api/auth/login-form.js')
         expect(login).toContain('<hanasand-login-form></hanasand-login-form>')
         expect(login).toContain('input:focus, input:focus-visible {')
         expect(login).toContain('background-color: #080808; color: #f6f6f3; border-color: #707070;')
