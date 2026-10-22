@@ -50,7 +50,10 @@ export async function getSsoStart(req: FastifyRequest, res: FastifyReply) {
     }
     res.header('Referrer-Policy', 'no-referrer')
     const query = req.query as { redirectPath?: unknown } | undefined
-    const body = authStartBody({ binding: randomBytes(32).toString('base64url'), redirectPath: query?.redirectPath }, identitySsoCallbackUri)
+    const body = authStartBody(
+        { binding: randomBytes(32).toString('base64url'), redirectPath: query?.redirectPath },
+        identitySsoCallbackUri,
+    )
     if (!body) return res.header('Cache-Control', 'no-store').status(400).send({ error: 'Sign-in request is invalid.' })
     return proxyIdentityJson(req, res, '/auth/sso/start', {
         method: 'POST',
