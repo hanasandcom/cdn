@@ -7,6 +7,7 @@ import { setIdentitySessionCookies, type IdentitySession } from '#utils/auth/ide
 const maxJsonBytes = 128 * 1024
 const timeoutMs = 10_000
 const validProviders = new Set(['apple', 'google'])
+const uuidPattern = /^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/i
 
 type IdentityError = { error?: unknown, code?: unknown }
 type IdentityJson = Record<string, unknown> & IdentityError
@@ -21,8 +22,8 @@ export async function getPasskeyOptions(req: FastifyRequest, res: FastifyReply) 
 
 export async function postPasskeyVerify(req: FastifyRequest, res: FastifyReply) {
     const body = jsonRecord(req.body)
-    if (!body || !boundedJson(body) || typeof body.challengeId !== 'string' || !body.challengeId
-        || body.challengeId.length > 128 || !isRecord(body.credential)) {
+    if (!body || !boundedJson(body) || typeof body.challengeId !== 'string'
+        || !uuidPattern.test(body.challengeId) || !isRecord(body.credential)) {
         return res.header('Cache-Control', 'no-store').status(400).send({ error: 'Passkey sign-in request is invalid.' })
     }
     return proxyIdentityJson(req, res, '/auth/passkeys/authenticate/verify', {
