@@ -51,16 +51,47 @@
         if (!state.month) return filteredUrl
         return appendQuery(filteredUrl, new URLSearchParams({ month: state.month }))
     }
+    let sessionRecovery = null
+    const recoverSession = () => {
+        if (sessionRecovery) return sessionRecovery
+        sessionRecovery = (async () => {
+            for (const delay of [0, 250, 750]) {
+                if (delay) await new Promise(resolve => setTimeout(resolve, delay))
+                try {
+                    const response = await fetch('/api/auth/session', {
+                        credentials: 'same-origin', cache: 'no-store',
+                    })
+                    if (response.ok) {
+                        const auth = await response.json()
+                        if (auth?.id) window.cdnAuthUser = auth
+                        return auth?.id ? 'valid' : 'unavailable'
+                    }
+                    if (response.status !== 401) return 'unavailable'
+                } catch {
+                    return 'unavailable'
+                }
+            }
+            return 'expired'
+        })().finally(() => { sessionRecovery = null })
+        return sessionRecovery
+    }
     const api = async (url, options = {}) => {
-        const response = await fetch(url, {
+        const request = () => fetch(url, {
             credentials: 'same-origin', cache: 'no-store', ...options,
         })
-        const result = await response.json().catch(() => null)
-        if (!response.ok) {
-            if (response.status === 401 && !isPublic) {
+        let response = await request()
+        if (response.status === 401 && !isPublic && url !== '/api/auth/session') {
+            const session = await recoverSession()
+            if (session === 'valid') response = await request()
+            else if (session === 'expired') {
                 location.replace('/login?returnTo=' + encodeURIComponent(location.pathname))
                 throw Error('Sign in required.')
+            } else {
+                throw Error('Could not verify your sign-in. Please try again.')
             }
+        }
+        const result = await response.json().catch(() => null)
+        if (!response.ok) {
             throw Error(result?.error || 'The photo library could not be loaded.')
         }
         return result
@@ -394,6 +425,9 @@
                     checkbox.checked = state.selected.has(file.id)
                     card.classList.toggle('is-selected', checkbox.checked)
                     checkbox.setAttribute('aria-label', `Select ${file.name}`)
+                    const selectionIndicator = document.createElement('span')
+                    selectionIndicator.className = 'photo-select-indicator'
+                    selectionIndicator.setAttribute('aria-hidden', 'true')
                     checkbox.addEventListener('click', event => event.stopPropagation())
                     checkbox.addEventListener('change', () => {
                         if (checkbox.checked) state.selected.add(file.id)
@@ -402,6 +436,7 @@
                         updateSelection()
                     })
                     card.append(checkbox)
+                    card.append(selectionIndicator)
                     const canRemove = state.activeAlbum && (state.activeAlbum.role === 'owner'
                         || (state.activeAlbum.role === 'contributor' && file.added_by === window.cdnAuthUser?.id))
                     if (canRemove) {

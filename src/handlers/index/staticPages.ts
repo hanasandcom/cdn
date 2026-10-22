@@ -263,17 +263,34 @@ hanasand-upload-picker:defined > .picker-fallback { display: none; }
     border: 2px solid transparent; border-radius: .55rem; background: #171717;
     transition: border-color .15s ease, box-shadow .15s ease;
 }
-.photo-card.is-selected { border-color: #70a7ff; box-shadow: 0 0 0 2px #70a7ff55; }
+.photo-card.is-selected { border-color: #70a7ff; box-shadow: 0 0 0 2px #70a7ff55; background: #163c72; }
 .photo-card > button:not(.photo-favorite) { display: block; width: 100%; height: 100%; padding: 0; border: 0; background: transparent; }
 .photo-card .preview { width: 100%; height: 100%; aspect-ratio: auto; object-fit: cover; transition: transform .18s ease; }
 .photo-card > button:hover .preview { transform: scale(1.035); }
 .photo-select {
     position: absolute; z-index: 1; top: .55rem; left: .55rem;
-    width: 1.35rem; height: 1.35rem; accent-color: #5e9cff;
-    opacity: 0; cursor: pointer; filter: drop-shadow(0 1px 3px #000);
+    width: 2rem; height: 2rem; margin: 0; opacity: 0; cursor: pointer;
 }
-.photo-card:hover .photo-select, .photo-select:focus-visible, .photo-select:checked { opacity: 1; }
-.photo-select:checked { width: 1.45rem; height: 1.45rem; }
+.photo-select-indicator {
+    position: absolute; z-index: 1; top: .72rem; left: .72rem; display: grid;
+    width: 1.35rem; height: 1.35rem; place-items: center; border: 2px solid #fff;
+    border-radius: 50%; background: #111c; color: #fff; pointer-events: none;
+    filter: drop-shadow(0 1px 3px #000); transition: background .12s ease, transform .12s ease;
+}
+.photo-card:hover .photo-select-indicator { transform: scale(1.08); }
+.photo-select:checked + .photo-select-indicator { border-color: #5e9cff; background: #1769e0; }
+.photo-select:checked + .photo-select-indicator::after {
+    width: .35rem; height: .65rem; border: solid #fff; border-width: 0 2px 2px 0;
+    content: ''; transform: translateY(-1px) rotate(45deg);
+}
+.photo-select:focus-visible + .photo-select-indicator { outline: 2px solid #fff; outline-offset: 3px; }
+.selection-count {
+    display: inline-flex; align-items: center; min-height: 2.1rem;
+    border: 1px solid #5e9cff; border-radius: 999px;
+    background: #5e9cff22; color: #fff; padding: .3rem .7rem;
+    font-size: .85rem; font-weight: 600; white-space: nowrap;
+}
+.selection-count[hidden] { display: none; }
 .photo-favorite {
     position: absolute; top: .35rem; right: .35rem; display: grid;
     width: 1.8rem; height: 1.8rem; place-items: center; border: 1px solid #555;
@@ -323,7 +340,7 @@ hanasand-upload-picker:defined > .picker-fallback { display: none; }
     .viewer-info { max-height: 30dvh; border-top: 1px solid #393939; border-left: 0; padding: .75rem 1rem; }
     .viewer-info h2 { margin-bottom: .5rem; }
 }
-@media (hover: none) { .photo-select { opacity: 1; } }
+@media (hover: none) { .photo-select-indicator { opacity: 1; } }
 @media (min-width: 48rem) {
     .picker-fallback { grid-template-columns: minmax(0, 1.05fr) minmax(0, .95fr); }
     .picker-fallback-drop-side { min-height: 26.25rem; border-right: 1px solid #393939; border-bottom: 0; padding: 1.5rem; }
@@ -660,7 +677,7 @@ export async function getGalleryPage(_req: FastifyRequest, res: FastifyReply) {
 <option value="1">1 per row</option><option value="3">3 per row</option>
 <option value="5" selected>5 per row</option></select>
 </label>
-<span id="selection-count" class="muted" hidden></span>
+<span id="selection-count" class="selection-count" aria-live="polite" aria-atomic="true" hidden></span>
 <select id="album-target" aria-label="Choose an album"><option value="">Add to album</option></select>
 <button id="add-to-album" type="button" disabled>Add selected</button>
 <button id="manage-album" type="button" hidden>Share</button>
