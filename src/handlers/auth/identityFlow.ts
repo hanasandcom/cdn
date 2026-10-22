@@ -1,4 +1,5 @@
 import { isIP } from 'node:net'
+import { randomBytes } from 'node:crypto'
 import type { FastifyReply, FastifyRequest } from 'fastify'
 import config from '#constants'
 import { setIdentitySessionCookies, type IdentitySession } from '#utils/auth/identitySessionCookies.ts'
@@ -39,6 +40,18 @@ export async function postSsoStart(req: FastifyRequest, res: FastifyReply) {
     const body = authStartBody(req.body)
     if (!body) return res.header('Cache-Control', 'no-store').status(400).send({ error: 'Sign-in request is invalid.' })
     return proxyIdentityJson(req, res, '/auth/sso/start', { method: 'POST', body })
+}
+
+export async function getSsoStart(req: FastifyRequest, res: FastifyReply) {
+    const query = req.query as { redirectPath?: unknown } | undefined
+    const body = authStartBody({ binding: randomBytes(32).toString('base64url'), redirectPath: query?.redirectPath })
+    if (!body) return res.header('Cache-Control', 'no-store').status(400).send({ error: 'Sign-in request is invalid.' })
+    return proxyIdentityJson(req, res, '/auth/sso/start', {
+        method: 'POST',
+        body,
+        redirectToUrl: true,
+        allowMissingOrigin: true,
+    })
 }
 
 export async function postSocialStart(req: FastifyRequest, res: FastifyReply) {
@@ -82,11 +95,17 @@ async function proxyIdentityJson(
     req: FastifyRequest,
     res: FastifyReply,
     path: string,
-    options: { method: 'GET' | 'POST', body?: Record<string, unknown>, acceptSession?: boolean },
+    options: {
+        method: 'GET' | 'POST',
+        body?: Record<string, unknown>,
+        acceptSession?: boolean,
+        redirectToUrl?: boolean,
+        allowMissingOrigin?: boolean,
+    },
 ) {
     const origin = req.headers.origin
     const host = String(req.headers.host || '').toLowerCase()
-    if (options.method === 'POST' && !origin) {
+    if (options.method === 'POST' && !origin && !options.allowMissingOrigin) {
         return res.header('Cache-Control', 'no-store').status(403).send({ error: 'Request origin was rejected.' })
     }
     if (origin) {
@@ -163,6 +182,9 @@ async function proxyIdentityJson(
             }
             if (path === '/auth/sso/start' || path.startsWith('/auth/social/')) {
                 setAuthBindingCookie(req, res, options.body?.binding)
+            }
+            if (options.redirectToUrl) {
+                return res.header('Cache-Control', 'no-store').code(303).header('Location', url.toString()).send()
             }
         }
         return res.header('Cache-Control', 'no-store').send(result)

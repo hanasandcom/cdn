@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test } from 'bun:test'
-import { getPasskeyOptions, postPasskeyVerify, postSocialStart, postSsoStart } from '../src/handlers/auth/identityFlow.ts'
+import { getPasskeyOptions, getSsoStart, postPasskeyVerify, postSocialStart, postSsoStart } from '../src/handlers/auth/identityFlow.ts'
 import getTargetRouteGroup from '../src/utils/rateLimit/getTargetRouteGroup.ts'
 
 const originalFetch = globalThis.fetch
@@ -34,6 +34,7 @@ function reply() {
         get payload() { return payload },
         header(name: string, value: string | string[]) { headers[name] = value; return result },
         status(value: number) { statusCode = value; return result },
+        code(value: number) { statusCode = value; return result },
         send(value: unknown) { payload = value; return result },
     }
     return result
@@ -122,6 +123,27 @@ describe('CDN Identity login proxies', () => {
         expect(res.headers['Set-Cookie']).toBe(
             `hanasand_auth_binding=${binding}; Max-Age=600; Path=/; SameSite=Lax; HttpOnly; Secure; Domain=.hanasand.com`,
         )
+    })
+
+    test('matches Hanasand SSO GET flow with a same-site Identity callback and CDN return URL', async () => {
+        let sent: Record<string, unknown> | undefined
+        globalThis.fetch = (async (_input, init) => {
+            sent = JSON.parse(String(init?.body))
+            return Response.json({ url: 'https://idp.example.test/authorize' })
+        }) as typeof fetch
+        const res = reply()
+
+        await getSsoStart(request({
+            method: 'GET',
+            headers: { host: 'cdn.hanasand.com', 'user-agent': 'test-browser' },
+            query: { redirectPath: '/gallery?sort=date' },
+        }) as never, res as never)
+
+        expect(sent?.redirectPath).toBe('https://cdn.hanasand.com/gallery?sort=date')
+        expect(sent?.binding).toMatch(/^[A-Za-z0-9_-]{43}$/)
+        expect(res.statusCode).toBe(303)
+        expect(res.headers.Location).toBe('https://idp.example.test/authorize')
+        expect(String(res.headers['Set-Cookie'])).toContain('; HttpOnly; Secure; Domain=.hanasand.com')
     })
 
     test('puts all sign-in API paths under route rate limits', () => {
