@@ -5,16 +5,6 @@ import { getSessionDetails, setSessionCookies } from '#utils/auth/session.ts'
 const uploadPickerPath = new URL('../../client/upload-picker.js', import.meta.url)
 const galleryClientPath = new URL('../../client/gallery.js', import.meta.url)
 const exifReaderPath = new URL('../../../node_modules/exifreader/dist/exif-reader.js', import.meta.url)
-const deviceProofWorkerPath = new URL('../../client/device-proof-sw.js', import.meta.url)
-
-export async function getDeviceProofServiceWorker(_req: FastifyRequest, res: FastifyReply) {
-    return res
-        .header('Cache-Control', 'no-cache')
-        .header('Service-Worker-Allowed', '/')
-        .type('text/javascript')
-        .send(await readFile(deviceProofWorkerPath))
-}
-
 export async function getUploadPickerScript(_req: FastifyRequest, res: FastifyReply) {
     const script = await readFile(uploadPickerPath)
     return res.header('Cache-Control', 'no-store').type('text/javascript').send(script)
@@ -360,7 +350,6 @@ function shell(title: string, body: string, options: { mainClass?: string, showB
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width">
 <title>${title} · Hanasand CDN</title>
-<script src="/api/auth/device-proof-client.js" defer></script>
 <style>${styles}</style>
 ${loginScript}
 <body class="${bodyClass}">
