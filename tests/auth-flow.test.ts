@@ -59,6 +59,10 @@ describe('CDN Identity login proxies', () => {
     })
 
     test('sets shared cookies after Identity verifies a passkey without returning the token', async () => {
+        const body = {
+            challengeId: '00000000-0000-4000-8000-000000000001',
+            credential: { id: 'credential' },
+        }
         let sent: Record<string, unknown> | undefined
         let forwarded = false
         globalThis.fetch = (async (_input, init) => {
@@ -72,15 +76,30 @@ describe('CDN Identity login proxies', () => {
         }) as typeof fetch
         const res = reply()
 
-        await postPasskeyVerify(request({ body: { challengeId: 'challenge', credential: { id: 'credential' } } }) as never, res as never)
+        await postPasskeyVerify(request({ body }) as never, res as never)
 
-        expect(sent).toEqual({ challengeId: 'challenge', credential: { id: 'credential' } })
+        expect(sent).toEqual(body)
         expect(forwarded).toBe(true)
         expect(res.payload).toEqual({ id: 'eirik', name: 'Eirik' })
         expect(JSON.stringify(res.payload)).not.toContain('secret-token')
         const cookies = res.headers['Set-Cookie'] as string[]
         expect(cookies.some(cookie => cookie.startsWith('access_token=secret-token'))).toBe(true)
         expect(cookies.every(cookie => cookie.includes('Domain=.hanasand.com'))).toBe(true)
+    })
+
+    test('rejects malformed passkey challenge IDs before contacting Identity', async () => {
+        let calls = 0
+        globalThis.fetch = (async () => {
+            calls++
+            return Response.json({ error: 'unexpected upstream request' })
+        }) as typeof fetch
+        const res = reply()
+
+        await postPasskeyVerify(request({ body: { challengeId: 'malformed', credential: { id: 'credential' } } }) as never, res as never)
+
+        expect(calls).toBe(0)
+        expect(res.statusCode).toBe(400)
+        expect(res.payload).toEqual({ error: 'Passkey sign-in request is invalid.' })
     })
 
     test('rejects cross-origin POSTs before contacting Identity', async () => {
