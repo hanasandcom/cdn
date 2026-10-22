@@ -334,7 +334,11 @@ describe('standalone CDN pages', () => {
         expect(login).toContain('<script src="/api/auth/device-proof-client.js" defer></script>')
         expect(login).not.toContain('<script src="https://identity.hanasand.com/api/auth/login-form.js" defer></script>')
         expect(login).not.toContain('<script src="https://api.hanasand.com/api/auth/login-form.js" defer></script>')
-        expect(login).toContain('<hanasand-login-form></hanasand-login-form>')
+        expect(login).toContain('<hanasand-login-form login-url="/api/auth/login"')
+        expect(login).toContain('passkey-options-url="/api/auth/passkeys/authenticate/options"')
+        expect(login).toContain('passkey-verify-url="/api/auth/passkeys/authenticate/verify"')
+        expect(login).toContain('sso-href="/api/auth/sso/start?redirectPath=%2Fgallery"')
+        expect(login).toContain('redirect-path="/gallery"')
         expect(login).toContain('input:focus, input:focus-visible {')
         expect(login).toContain('background-color: #080808; color: #f6f6f3; border-color: #707070;')
         expect(login).toContain('input::selection { background: #303030; color: #f6f6f3; }')
@@ -351,11 +355,21 @@ describe('standalone CDN pages', () => {
         expect(galleryClient).toContain('location.replace(\'/login?returnTo=\'')
         expect(upload).not.toContain('https://hanasand.com/upload')
         expect(gallery).not.toContain('https://hanasand.com/gallery')
-        expect(login).toContain('fetch(\'/api/auth/login\'')
+        expect(login).not.toContain('new FormData(form)')
         expect(login).not.toContain('hanasand.com/login')
         expect(uploadHeaders['Cache-Control']).toBe('private, no-store')
         expect(galleryHeaders['Cache-Control']).toBe('private, no-store')
         expect(loginHeaders['Cache-Control']).toBe('private, no-store')
+    })
+
+    test('keeps login return paths on CDN and escapes markup', async () => {
+        const { html } = await page(getLoginPage, { query: { returnTo: '/gallery?sort=date&view=images' } })
+        expect(html).toContain('redirect-path="/gallery?sort=date&amp;view=images"')
+        expect(html).toContain('sso-href="/api/auth/sso/start?redirectPath=%2Fgallery%3Fsort%3Ddate%26view%3Dimages"')
+
+        const { html: unsafe } = await page(getLoginPage, { query: { returnTo: '//attacker.example/path' } })
+        expect(unsafe).toContain('redirect-path="/gallery"')
+        expect(unsafe).toContain('sso-href="/api/auth/sso/start?redirectPath=%2Fgallery"')
     })
 
     test('serves the shared picker and image metadata assets', async () => {
