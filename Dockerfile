@@ -25,4 +25,4 @@ RUN bun install
 EXPOSE 8080
 
 # Start the application
-CMD /usr/src/app/entrypoint.sh
+CMD ["/usr/src/app/entrypoint.sh"]
