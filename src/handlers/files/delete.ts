@@ -1,6 +1,6 @@
 import type { FastifyReply, FastifyRequest } from 'fastify'
 import run from '#db'
-import { removeStoredFile } from '#utils/fileStorage.ts'
+import { removeStoredFiles } from '#utils/fileStorage.ts'
 import tokenWrapper from '#utils/auth/tokenWrapper.ts'
 import filePermissionsWrapper from '#utils/auth/filePermissionsWrapper.ts'
 
@@ -25,7 +25,7 @@ export default async function deleteFile(req: FastifyRequest, res: FastifyReply)
 
     try {
         const result = await run(
-            'DELETE FROM files WHERE id = $1 RETURNING id, storage_key',
+            'DELETE FROM files WHERE id = $1 RETURNING id, storage_key,thumbnail_storage_key',
             [id]
         )
 
@@ -33,7 +33,7 @@ export default async function deleteFile(req: FastifyRequest, res: FastifyReply)
             return res.status(404).send({ error: 'File not found' })
         }
 
-        await removeStoredFile(result.rows[0].storage_key)
+        await removeStoredFiles([result.rows[0].storage_key, result.rows[0].thumbnail_storage_key])
         return { deleted: result.rows[0].id }
     } catch (error) {
         console.log('Error deleting image:', error)

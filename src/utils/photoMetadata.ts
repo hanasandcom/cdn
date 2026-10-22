@@ -102,7 +102,6 @@ export function readPhotoMetadata(data: Buffer, type: string): PhotoMetadata {
         latitude: null, longitude: null,
     }
     if (!/^image\/(jpeg|png|webp|avif|tiff|heic|heif)$/i.test(type)) return empty
-    if (data.length > 8 * 1024 * 1024) data = data.subarray(0, 8 * 1024 * 1024)
 
     try {
         const tags = ExifReader.load(data, { expanded: true, computed: true, excludeTags: { mpf: true } }) as Record<string, unknown>
@@ -126,11 +125,12 @@ export function readPhotoMetadata(data: Buffer, type: string): PhotoMetadata {
             ?? coordinate(firstTag(groups, ['GPSLongitude', 'Longitude']))
         const validCoordinates = latitude !== null && longitude !== null
             && Math.abs(latitude) <= 90 && Math.abs(longitude) <= 180
+        const locationGroups = [iptc, xmp, exif, pngText]
         const locality = [
-            firstTag([iptc, xmp], ['SubLocation', 'Sublocation', 'LocationName', 'Location']),
-            firstTag([iptc, xmp], ['City']),
-            firstTag([iptc, xmp], ['ProvinceState', 'State', 'Province']),
-            firstTag([iptc, xmp], ['CountryPrimaryLocationName', 'CountryName', 'Country']),
+            firstTag(locationGroups, ['SubLocation', 'Sublocation', 'LocationName', 'Location']),
+            firstTag(locationGroups, ['City']),
+            firstTag(locationGroups, ['ProvinceState', 'State', 'Province']),
+            firstTag(locationGroups, ['CountryPrimaryLocationName', 'CountryName', 'Country']),
         ].filter(Boolean).filter((value, index, all) => all.indexOf(value) === index).join(', ')
 
         return {

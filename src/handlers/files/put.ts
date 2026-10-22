@@ -2,8 +2,10 @@ import type { FastifyReply, FastifyRequest } from 'fastify'
 import tokenWrapper from '#utils/auth/tokenWrapper.ts'
 import filePermissionsWrapper from '#utils/auth/filePermissionsWrapper.ts'
 import run from '#db'
-import { persistFile, removeStoredFile, StorageError } from '#utils/fileStorage.ts'
+import { persistFile, removeStoredFiles, StorageError } from '#utils/fileStorage.ts'
 import { beginUpload } from '#utils/uploadGuard.ts'
+import { readPhotoMetadata } from '#utils/photoMetadata.ts'
+import { createPhotoThumbnail } from '#utils/photoThumbnail.ts'
 
 type PutFileProps = {
     name?: string
@@ -71,17 +73,26 @@ export default async function putFile(req: FastifyRequest, res: FastifyReply) {
         if (data) {
             const finish = beginUpload(userId)
             let oldKey: string | undefined
+            let oldThumbnailKey: string | undefined
             try {
-                const current = await run('SELECT owner FROM files WHERE id=$1', [id])
+                const current = await run('SELECT owner,type FROM files WHERE id=$1', [id])
                 const buffer = Buffer.from(data, 'base64')
-                await persistFile(current.rows[0]?.owner || userId, buffer, async (client, key) => {
-                    const old = await client.query('SELECT storage_key FROM files WHERE id=$1 FOR UPDATE', [id])
+                const fileType = type || current.rows[0]?.type || 'application/octet-stream'
+                const metadata = readPhotoMetadata(buffer, fileType)
+                const thumbnail = await createPhotoThumbnail(buffer, fileType)
+                await persistFile(current.rows[0]?.owner || userId, buffer, async (client, key, thumbnailKey, thumbnailSize) => {
+                    const old = await client.query('SELECT storage_key,thumbnail_storage_key FROM files WHERE id=$1 FOR UPDATE', [id])
                     if (!old.rows.length) throw new StorageError(404, 'File not found')
                     oldKey = old.rows[0].storage_key
+                    oldThumbnailKey = old.rows[0].thumbnail_storage_key
                     result = await client.query(sql, values)
-                    await client.query('UPDATE files SET storage_key=$2,storage_size=$3 WHERE id=$1', [id,key,buffer.length])
-                }, id)
-                await removeStoredFile(oldKey)
+                    await client.query(`UPDATE files SET storage_key=$2,storage_size=$3,thumbnail_storage_key=$4,
+                        thumbnail_size=$5,thumbnail_processed=TRUE,photo_taken_at=$6,photo_taken_offset_minutes=$7,
+                        location_label=$8,latitude=$9,longitude=$10 WHERE id=$1`,
+                    [id, key, buffer.length, thumbnailKey || null, thumbnailSize || null, metadata.photoTakenAt,
+                        metadata.photoTakenOffsetMinutes, metadata.locationLabel, metadata.latitude, metadata.longitude])
+                }, id, thumbnail)
+                await removeStoredFiles([oldKey, oldThumbnailKey])
             } finally { finish() }
         } else result = await run(sql, values)
         if (!result) throw new Error('File update failed')

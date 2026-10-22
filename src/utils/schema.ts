@@ -56,6 +56,9 @@ export default async function ensureSchema() {
             ALTER TABLE files ADD COLUMN IF NOT EXISTS owner TEXT;
             ALTER TABLE files ADD COLUMN IF NOT EXISTS storage_key TEXT;
             ALTER TABLE files ADD COLUMN IF NOT EXISTS storage_size BIGINT;
+            ALTER TABLE files ADD COLUMN IF NOT EXISTS thumbnail_storage_key TEXT;
+            ALTER TABLE files ADD COLUMN IF NOT EXISTS thumbnail_size BIGINT;
+            ALTER TABLE files ADD COLUMN IF NOT EXISTS thumbnail_processed BOOLEAN NOT NULL DEFAULT FALSE;
             ALTER TABLE files ADD COLUMN IF NOT EXISTS photo_taken_at TIMESTAMPTZ;
             ALTER TABLE files ADD COLUMN IF NOT EXISTS photo_taken_offset_minutes SMALLINT;
             ALTER TABLE files ADD COLUMN IF NOT EXISTS is_favorite BOOLEAN NOT NULL DEFAULT FALSE;

@@ -132,7 +132,7 @@ describe('standalone CDN pages', () => {
         const authScript = scripts[0]?.[1]
         const uploadScript = scripts.at(-1)?.[1]
 
-        expect(authScript).toContain("window.cdnAuth = fetch('/api/auth/session'")
+        expect(authScript).toContain('window.cdnAuth = fetch(\'/api/auth/session\'')
         expect(uploadScript).toBeDefined()
         expect(() => new Function(uploadScript!)).not.toThrow()
         expect(html).toContain('id="upload-hint" class="upload-hint">Sign in to upload multiple files at once.')
@@ -186,7 +186,8 @@ describe('standalone CDN pages', () => {
         expect(gallery).toContain('id="photo-search"')
         expect(gallery).toContain('id="date-timeline"')
         expect(gallery).toContain('/assets/gallery.js')
-        expect(galleryClient).toContain("const fileUrl = id => '/api/files/' + encodeURIComponent(id)")
+        expect(galleryClient).toContain('const fileUrl = (id, thumbnail = false) => \'/api/files/\'')
+        expect(galleryClient).toContain('?variant=thumbnail')
         expect(galleryClient).toContain('/timeline')
         expect(galleryClient).toContain('photo-favorite')
         expect(galleryClient).toContain('button.dataset.view')
@@ -207,7 +208,7 @@ describe('standalone CDN pages', () => {
         expect(login).toContain('button:focus-visible, a:focus-visible, input:focus-visible')
         expect(login).toContain('outline: 2px solid #999;')
         expect(login).toContain('input:focus-visible { outline-color: #707070; outline-offset: 2px; }')
-        expect(galleryClient).toContain('preview.src = fileUrl(file.id)')
+        expect(galleryClient).toContain('preview.src = fileUrl(file.id, !isVideo)')
         expect(galleryClient).toContain('viewer.showModal()')
         expect(galleryClient).toContain('viewerImage.src = url')
         expect(galleryClient).toContain('const movePhoto = step =>')

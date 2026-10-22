@@ -5,6 +5,7 @@ import { persistFile, maxFileBytes, StorageError } from '#utils/fileStorage.ts'
 import { beginGuestUpload, beginUpload } from '#utils/uploadGuard.ts'
 import { getSessionUserId } from '#utils/auth/session.ts'
 import { readPhotoMetadata } from '#utils/photoMetadata.ts'
+import { createPhotoThumbnail } from '#utils/photoThumbnail.ts'
 
 export default async function postFile(req: FastifyRequest, res: FastifyReply) {
     const user = typeof req.headers.id === 'string' ? req.headers.id : ''
@@ -41,15 +42,17 @@ export default async function postFile(req: FastifyRequest, res: FastifyReply) {
         const id = randomUUID()
         const path = userId ? fields.path || id : id
         const metadata = readPhotoMetadata(data, type)
-        await persistFile(owner, data, async (client, key) => {
+        const thumbnail = await createPhotoThumbnail(data, type)
+        await persistFile(owner, data, async (client, key, thumbnailKey, thumbnailSize) => {
             await client.query(`INSERT INTO files
-                (id,name,description,data,path,type,owner,storage_key,storage_size,photo_taken_at,
-                 photo_taken_offset_minutes,location_label,latitude,longitude)
-                VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)`,
+                (id,name,description,data,path,type,owner,storage_key,storage_size,thumbnail_storage_key,thumbnail_size,thumbnail_processed,
+                 photo_taken_at,photo_taken_offset_minutes,location_label,latitude,longitude)
+                VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17)`,
             [id, fields.name, fields.description || null, Buffer.alloc(0), path, type, owner, key, data!.length,
+                thumbnailKey || null, thumbnailSize || null, true,
                 metadata.photoTakenAt, metadata.photoTakenOffsetMinutes, metadata.locationLabel,
                 metadata.latitude, metadata.longitude])
-        })
+        }, undefined, thumbnail)
         return res.send({ id, path, owner: userId || null })
     } catch (error) {
         const e = error as Error & { statusCode?: number, code?: string }

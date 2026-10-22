@@ -24,11 +24,42 @@ export function fileBody(file: { storage_key?: string, data: Buffer }) {
 export async function removeStoredFile(key?: string) {
     if (key) await unlink(storagePath(key)).catch(error => { if (error.code !== 'ENOENT') throw error })
 }
+export async function removeStoredFiles(keys: Array<string | undefined>) {
+    await Promise.all(keys.filter(Boolean).map(key => removeStoredFile(key)))
+}
+export async function storeThumbnail(fileId: string, data: Buffer) {
+    if (!data.length || data.length > 2 * 1024 * 1024) return null
+    const disk = await statfs(storageDirectory)
+    if (disk.bavail * disk.bsize - data.length < reserveBytes) {
+        await markThumbnailProcessed(fileId)
+        return null
+    }
+    const key = randomUUID()
+    let written = false
+    try {
+        await writeFile(storagePath(key), data, { flag: 'wx', mode: 0o600 })
+        written = true
+        const result = await pool.query(`UPDATE files
+            SET thumbnail_storage_key=$2,thumbnail_size=$3,thumbnail_processed=TRUE
+            WHERE id=$1 AND thumbnail_storage_key IS NULL
+            RETURNING thumbnail_storage_key,thumbnail_size`, [fileId, key, data.length])
+        if (result.rowCount) return { key, size: data.length }
+        await removeStoredFile(key)
+        return null
+    } catch (error) {
+        if (written) await removeStoredFile(key).catch(() => {})
+        throw error
+    }
+}
+export async function markThumbnailProcessed(fileId: string) {
+    await pool.query('UPDATE files SET thumbnail_processed=TRUE WHERE id=$1 AND thumbnail_storage_key IS NULL', [fileId])
+}
 export async function storageStatus() {
     const [disk, result] = await Promise.all([
         statfs(storageDirectory),
-        pool.query(`SELECT COALESCE(SUM(storage_size),0)::text AS used,
-            COALESCE(SUM(storage_size) FILTER (WHERE uploaded_at > NOW()-INTERVAL '15 minutes'),0)::text AS recent
+        pool.query(`SELECT COALESCE(SUM(COALESCE(storage_size,octet_length(data))+COALESCE(thumbnail_size,0)),0)::text AS used,
+            COALESCE(SUM(COALESCE(storage_size,octet_length(data))+COALESCE(thumbnail_size,0))
+                FILTER (WHERE uploaded_at > NOW()-INTERVAL '15 minutes'),0)::text AS recent
             FROM files WHERE storage_key IS NOT NULL`),
     ])
     const used = Number(result.rows[0].used)
@@ -47,35 +78,45 @@ export async function storageStatus() {
 // Serialize reservations across processes, including replacement uploads.
 export async function persistFile(
     owner: string, data: Buffer,
-    save: (client: import('pg').PoolClient, key: string) => Promise<void>,
+    save: (client: import('pg').PoolClient, key: string, thumbnailKey?: string, thumbnailSize?: number) => Promise<void>,
     replacing?: string,
+    thumbnail?: Buffer | null,
 ) {
     if (!data.length || data.length > maxFileBytes) throw new StorageError(413, 'Files must be between 1 byte and 50 MiB.')
+    if (thumbnail && thumbnail.length > 2 * 1024 * 1024) throw new StorageError(413, 'Generated thumbnail is too large.')
     const client = await pool.connect()
     const key = randomUUID()
-    let written = false
+    const thumbnailKey = thumbnail?.length ? randomUUID() : undefined
+    const bytesToWrite = data.length + (thumbnail?.length || 0)
+    const written: string[] = []
     try {
         await client.query('BEGIN')
         await client.query('SELECT pg_advisory_xact_lock(hashtext(\'cdn-file-storage\'))')
         const usage = await client.query(`SELECT
-            COALESCE(SUM(storage_size) FILTER (WHERE storage_key IS NOT NULL),0)::text AS total,
-            COALESCE(SUM(COALESCE(storage_size,octet_length(data))) FILTER (WHERE owner=$1),0)::text AS owned
+            COALESCE(SUM(COALESCE(storage_size,octet_length(data))+COALESCE(thumbnail_size,0))
+                FILTER (WHERE storage_key IS NOT NULL),0)::text AS total,
+            COALESCE(SUM(COALESCE(storage_size,octet_length(data))+COALESCE(thumbnail_size,0))
+                FILTER (WHERE owner=$1),0)::text AS owned
             FROM files WHERE id IS DISTINCT FROM $2`, [owner, replacing || null])
-        if (Number(usage.rows[0].total) + data.length > storageLimit) throw new StorageError(507, 'Upload storage is full.')
-        if (Number(usage.rows[0].owned) + data.length > ownerLimit) {
+        if (Number(usage.rows[0].total) + bytesToWrite > storageLimit) throw new StorageError(507, 'Upload storage is full.')
+        if (Number(usage.rows[0].owned) + bytesToWrite > ownerLimit) {
             throw new StorageError(413, 'Your upload storage limit has been reached.')
         }
         const disk = await statfs(storageDirectory)
-        if (disk.bavail * disk.bsize - data.length < reserveBytes) {
+        if (disk.bavail * disk.bsize - bytesToWrite < reserveBytes) {
             throw new StorageError(507, 'Uploads are paused because disk space is low.')
         }
         await writeFile(storagePath(key), data, { flag: 'wx', mode: 0o600 })
-        written = true
-        await save(client, key)
+        written.push(key)
+        if (thumbnail && thumbnailKey) {
+            await writeFile(storagePath(thumbnailKey), thumbnail, { flag: 'wx', mode: 0o600 })
+            written.push(thumbnailKey)
+        }
+        await save(client, key, thumbnailKey, thumbnail?.length)
         await client.query('COMMIT')
     } catch (error) {
         await client.query('ROLLBACK').catch(() => {})
-        if (written) await removeStoredFile(key)
+        await removeStoredFiles(written).catch(() => {})
         throw error
     } finally { client.release() }
 }

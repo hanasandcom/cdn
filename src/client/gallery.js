@@ -25,7 +25,8 @@
         view: 'library', selected: new Set(), offset: 0, recentOffset: 0,
         albumOffset: 0, photos: [], photoIndex: 0, search: '', month: '', months: [], searchRequest: 0,
     }
-    const fileUrl = id => '/api/files/' + encodeURIComponent(id)
+    const fileUrl = (id, thumbnail = false) => '/api/files/' + encodeURIComponent(id)
+        + (thumbnail ? '?variant=thumbnail' : '')
     const appendQuery = (url, params) => params.size
         ? `${url}${url.includes('?') ? '&' : '?'}${params}` : url
     const withSearch = url => {
@@ -329,7 +330,7 @@
                 const isVideo = /^video\/(mp4|webm|ogg)$/i.test(file.type)
                 const preview = document.createElement(isVideo ? 'video' : 'img')
                 preview.className = 'preview'
-                preview.src = fileUrl(file.id)
+                preview.src = fileUrl(file.id, !isVideo)
                 preview.decoding = 'async'
                 preview.loading = firstImage ? 'eager' : 'lazy'
                 if (isVideo) {
