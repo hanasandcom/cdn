@@ -205,7 +205,7 @@ hanasand-upload-picker:defined > .picker-fallback { display: none; }
 .photo-group-heading h3 { margin: 0; font-size: 1rem; }
 .photo-group-heading span { color: #999; font-size: .85rem; }
 .photo-grid {
-    display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 13rem), 1fr));
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 18rem), 1fr));
     gap: 1.6rem 2.25rem; align-content: start;
 }
 .library-grid { display: grid; align-content: start; }

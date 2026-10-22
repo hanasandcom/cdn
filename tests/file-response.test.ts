@@ -185,6 +185,7 @@ describe('standalone CDN pages', () => {
         expect(gallery).toContain('id="photo-library"')
         expect(gallery).toContain('id="photo-search"')
         expect(gallery).toContain('id="date-timeline"')
+        expect(gallery).toContain('repeat(auto-fill, minmax(min(100%, 18rem), 1fr))')
         expect(gallery).toContain('/assets/gallery.js')
         expect(galleryClient).toContain('const fileUrl = (id, thumbnail = false) => \'/api/files/\'')
         expect(galleryClient).toContain('?variant=thumbnail')
