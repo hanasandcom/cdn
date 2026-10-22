@@ -205,6 +205,7 @@ describe('CDN Identity login proxies', () => {
         expect(called).not.toContain('hanasand.com')
         expect(sent?.redirectPath).toBe('https://cdn.hanasand.com/gallery')
         expect(sent?.binding).toMatch(/^[A-Za-z0-9_-]{43}$/)
+        expect(sent?.callbackUri).toBe('https://identity.hanasand.com/api/auth/sso/callback')
         expect(res.headers.Location).toBe('https://accounts.google.com/o/oauth2/auth')
         expect(res.statusCode).toBe(303)
         expect(res.headers['Cache-Control']).toBe('no-store')

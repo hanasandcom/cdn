@@ -7,6 +7,7 @@ import { setIdentitySessionCookies, type IdentitySession } from '#utils/auth/ide
 const maxJsonBytes = 128 * 1024
 const timeoutMs = 10_000
 const validProviders = new Set(['apple', 'google'])
+const identitySsoCallbackUri = 'https://identity.hanasand.com/api/auth/sso/callback'
 const uuidPattern = /^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/i
 
 type IdentityError = { error?: unknown, code?: unknown }
@@ -38,7 +39,7 @@ export async function getSocialProviders(req: FastifyRequest, res: FastifyReply)
 }
 
 export async function postSsoStart(req: FastifyRequest, res: FastifyReply) {
-    const body = authStartBody(req.body)
+    const body = authStartBody(req.body, identitySsoCallbackUri)
     if (!body) return res.header('Cache-Control', 'no-store').status(400).send({ error: 'Sign-in request is invalid.' })
     return proxyIdentityJson(req, res, '/auth/sso/start', { method: 'POST', body })
 }
@@ -49,7 +50,10 @@ export async function getSsoStart(req: FastifyRequest, res: FastifyReply) {
     }
     res.header('Referrer-Policy', 'no-referrer')
     const query = req.query as { redirectPath?: unknown } | undefined
-    const body = authStartBody({ binding: randomBytes(32).toString('base64url'), redirectPath: query?.redirectPath })
+    const body = authStartBody(
+        { binding: randomBytes(32).toString('base64url'), redirectPath: query?.redirectPath },
+        identitySsoCallbackUri,
+    )
     if (!body) return res.header('Cache-Control', 'no-store').status(400).send({ error: 'Sign-in request is invalid.' })
     return proxyIdentityJson(req, res, '/auth/sso/start', {
         method: 'POST',
@@ -69,12 +73,12 @@ export async function postSocialStart(req: FastifyRequest, res: FastifyReply) {
     return proxyIdentityJson(req, res, `/auth/social/${provider}/start`, { method: 'POST', body })
 }
 
-function authStartBody(value: unknown) {
+function authStartBody(value: unknown, callbackUri?: string) {
     if (!isRecord(value)) return null
     const binding = value.binding === undefined ? randomBytes(32).toString('base64url') : value.binding
     if (typeof binding !== 'string' || !/^[A-Za-z0-9_-]{43}$/.test(binding)) return null
     const redirectUrl = localRedirectUrl(value.redirectPath)
-    return { binding, redirectPath: redirectUrl }
+    return { binding, redirectPath: redirectUrl, ...(callbackUri ? { callbackUri } : {}) }
 }
 
 function localRedirectUrl(value: unknown) {
