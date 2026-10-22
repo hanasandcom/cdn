@@ -53,18 +53,21 @@ export async function postSocialStart(req: FastifyRequest, res: FastifyReply) {
 
 function authStartBody(value: unknown) {
     if (!isRecord(value) || typeof value.binding !== 'string' || !/^[A-Za-z0-9_-]{43}$/.test(value.binding)) return null
-    const redirectPath = localRedirectPath(value.redirectPath)
-    return { binding: value.binding, redirectPath }
+    const redirectUrl = localRedirectUrl(value.redirectPath)
+    return { binding: value.binding, redirectPath: redirectUrl }
 }
 
-function localRedirectPath(value: unknown) {
-    if (typeof value !== 'string' || value.length > 2048 || !value.startsWith('/')
-        || value.startsWith('//') || value.includes('\\') || hasControlCharacters(value)) return '/gallery'
+function localRedirectUrl(value: unknown) {
+    if (typeof value !== 'string' || value.length > 2048 || value.includes('\\') || hasControlCharacters(value)) {
+        return 'https://cdn.hanasand.com/gallery'
+    }
     try {
         const url = new URL(value, 'https://cdn.hanasand.com')
-        return url.origin === 'https://cdn.hanasand.com' ? `${url.pathname}${url.search}${url.hash}` : '/gallery'
+        return url.origin === 'https://cdn.hanasand.com'
+            ? url.href
+            : 'https://cdn.hanasand.com/gallery'
     } catch {
-        return '/gallery'
+        return 'https://cdn.hanasand.com/gallery'
     }
 }
 
@@ -158,6 +161,9 @@ async function proxyIdentityJson(
                     error: 'Sign-in service returned an invalid provider URL.',
                 })
             }
+            if (path === '/auth/sso/start' || path.startsWith('/auth/social/')) {
+                setAuthBindingCookie(req, res, options.body?.binding)
+            }
         }
         return res.header('Cache-Control', 'no-store').send(result)
     } catch (error) {
@@ -166,6 +172,14 @@ async function proxyIdentityJson(
             error: 'Sign-in service is unavailable. Please try again.',
         })
     }
+}
+
+function setAuthBindingCookie(req: FastifyRequest, res: FastifyReply, binding: unknown) {
+    if (typeof binding !== 'string' || !/^[A-Za-z0-9_-]{43}$/.test(binding)) return false
+    const hostname = String(req.headers.host || '').split(':')[0].toLowerCase()
+    if (hostname !== 'cdn.hanasand.com') return false
+    res.header('Set-Cookie', `hanasand_auth_binding=${binding}; Max-Age=600; Path=/; SameSite=Lax; HttpOnly; Secure; Domain=.hanasand.com`)
+    return true
 }
 
 async function readIdentityJson(response: Response): Promise<IdentityJson | null> {

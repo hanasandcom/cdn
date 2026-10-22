@@ -101,11 +101,27 @@ describe('CDN Identity login proxies', () => {
         }) as typeof fetch
         const ssoReply = reply()
         await postSsoStart(request({ body: { binding: 'a'.repeat(43), redirectPath: '//attacker.example/' } }) as never, ssoReply as never)
-        expect(sent?.redirectPath).toBe('/gallery')
+        expect(sent?.redirectPath).toBe('https://cdn.hanasand.com/gallery')
+
+        await postSsoStart(request({ body: { binding: 'a'.repeat(43), redirectPath: '/photos?sort=date' } }) as never, reply() as never)
+        expect(sent?.redirectPath).toBe('https://cdn.hanasand.com/photos?sort=date')
 
         const badProvider = reply()
         await postSocialStart(request({ params: { provider: 'https://attacker.example' }, body: { binding: 'a'.repeat(43) } }) as never, badProvider as never)
         expect(badProvider.statusCode).toBe(404)
+    })
+
+    test('binds SSO in a short-lived shared HttpOnly cookie before returning the provider URL', async () => {
+        const binding = 'b'.repeat(43)
+        globalThis.fetch = (async () => Response.json({ url: 'https://idp.example.test/authorize' })) as typeof fetch
+        const res = reply()
+
+        await postSsoStart(request({ body: { binding, redirectPath: '/gallery' } }) as never, res as never)
+
+        expect(res.payload).toEqual({ url: 'https://idp.example.test/authorize' })
+        expect(res.headers['Set-Cookie']).toBe(
+            `hanasand_auth_binding=${binding}; Max-Age=600; Path=/; SameSite=Lax; HttpOnly; Secure; Domain=.hanasand.com`,
+        )
     })
 
     test('puts all sign-in API paths under route rate limits', () => {
