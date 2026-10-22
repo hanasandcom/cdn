@@ -1,6 +1,7 @@
 import type { FastifyReply, FastifyRequest } from 'fastify'
 import { isIP } from 'node:net'
 import config from '#constants'
+import { setIdentitySessionCookies } from '#utils/auth/identitySessionCookies.ts'
 
 type LoginPayload = { username?: string, password?: string }
 type IdentityLogin = {
@@ -26,7 +27,9 @@ export default async function login(req: FastifyRequest, res: FastifyReply) {
             headers: {
                 'Content-Type': 'application/json',
                 'x-request-id': req.id,
-                ...(typeof req.headers['x-device-public-jwk'] === 'string' ? { 'x-device-public-jwk': req.headers['x-device-public-jwk'] } : {}),
+                ...(typeof req.headers['x-device-public-jwk'] === 'string'
+                    ? { 'x-device-public-jwk': req.headers['x-device-public-jwk'] }
+                    : {}),
                 'user-agent': String(req.headers['user-agent'] || '').slice(0, 1000),
                 ...(isIP(req.ip) ? { 'x-forwarded-for': req.ip } : {}),
             },
@@ -47,22 +50,16 @@ export default async function login(req: FastifyRequest, res: FastifyReply) {
             return res.status(502).send({ error: 'Sign-in service returned an incomplete session.' })
         }
 
-        const hostname = String(req.headers.host || '').split(':')[0].toLowerCase()
-        const sharedDomain = hostname === 'hanasand.com' || hostname.endsWith('.hanasand.com')
-            ? '; Domain=.hanasand.com'
-            : ''
-        const secure = sharedDomain || req.protocol === 'https' ? '; Secure' : ''
-        const expires = result.expires_at ? `; Expires=${new Date(result.expires_at).toUTCString()}` : ''
-        const cookieOptions = `${expires}; Path=/; SameSite=Lax${sharedDomain}${secure}`
-        const cookies = [
-            `id=${encodeURIComponent(result.id)}${cookieOptions}`,
-            `name=${encodeURIComponent(result.name)}${cookieOptions}`,
-            `avatar=${encodeURIComponent(result.avatar || '')}${cookieOptions}`,
-            `access_token=${encodeURIComponent(result.token)}${cookieOptions}`,
-            ...(result.expires_at ? [`session_expires_at=${encodeURIComponent(result.expires_at)}${cookieOptions}`] : []),
-            `auth_checked_at=${encodeURIComponent(new Date().toISOString())}${cookieOptions}`,
-        ]
-        res.header('Set-Cookie', cookies)
+        if (!result.expires_at || !setIdentitySessionCookies(req, res, {
+            id: result.id,
+            name: result.name,
+            avatar: result.avatar,
+            token: result.token,
+            expires_at: result.expires_at,
+        })) {
+            req.log.error({ requestId: req.id }, 'Identity returned an invalid session expiry')
+            return res.status(502).send({ error: 'Sign-in service returned an invalid session.' })
+        }
         res.header('Cache-Control', 'no-store')
         return res.send({ id: result.id, name: result.name })
     } catch (error) {

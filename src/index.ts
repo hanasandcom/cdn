@@ -6,7 +6,6 @@ import { prepareStorage } from '#utils/fileStorage.ts'
 import getIndex from './handlers/index/get.ts'
 import {
     getExifReaderScript,
-    getDeviceProofServiceWorker,
     getGalleryPage,
     getGalleryClientScript,
     getLoginPage,
@@ -15,6 +14,15 @@ import {
     getSharedAlbumPage,
 } from './handlers/index/staticPages.ts'
 import login from './handlers/auth/login.ts'
+import loginForm from './handlers/auth/loginForm.ts'
+import {
+    getPasskeyOptions,
+    getSocialProviders,
+    postPasskeyVerify,
+    postSocialStart,
+    getSsoStart,
+    postSsoStart,
+} from './handlers/auth/identityFlow.ts'
 import getSession from './handlers/auth/session.ts'
 import logout from './handlers/auth/logout.ts'
 import redirectLegacyFile from './handlers/files/redirectLegacy.ts'
@@ -77,11 +85,17 @@ fastify.get('/upload', getUploadPage)
 fastify.get('/assets/exifreader.js', getExifReaderScript)
 fastify.get('/assets/upload-picker.js', getUploadPickerScript)
 fastify.get('/assets/gallery.js', getGalleryClientScript)
-fastify.get('/device-proof-sw.js', getDeviceProofServiceWorker)
 fastify.get('/gallery', getGalleryPage)
 fastify.get('/shared/:token', getSharedAlbumPage)
 fastify.get('/login', getLoginPage)
 fastify.post('/api/auth/login', login)
+fastify.get('/api/auth/login-form.js', loginForm)
+fastify.get('/api/auth/passkeys/authenticate/options', getPasskeyOptions)
+fastify.post('/api/auth/passkeys/authenticate/verify', postPasskeyVerify)
+fastify.get('/api/auth/social/providers', getSocialProviders)
+fastify.post('/api/auth/social/:provider/start', postSocialStart)
+fastify.get('/api/auth/sso/start', getSsoStart)
+fastify.post('/api/auth/sso/start', postSsoStart)
 fastify.get('/api/auth/session', getSession)
 fastify.get('/logout', logout)
 fastify.get('/files/:id', redirectLegacyFile)
