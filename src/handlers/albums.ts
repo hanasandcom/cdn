@@ -4,7 +4,7 @@ import run from '#db'
 import { getSessionUserId } from '#utils/auth/session.ts'
 
 type AlbumParams = { id: string, fileId?: string, userId?: string, token?: string }
-type AlbumQuery = { limit?: string, offset?: string, search?: string }
+type AlbumQuery = { limit?: string, offset?: string, search?: string, month?: string }
 type AlbumBody = { name?: unknown, isPublic?: unknown, userId?: unknown, role?: unknown, fileIds?: unknown }
 
 async function signedIn(req: FastifyRequest, res: FastifyReply) {
@@ -42,6 +42,30 @@ function validName(value: unknown): string | null {
     if (typeof value !== 'string') return null
     const name = value.trim()
     return name.length > 0 && name.length <= 120 && !/[\0\r\n]/.test(name) ? name : null
+}
+
+function validMonth(value: string | undefined): string {
+    if (!value) return ''
+    return /^\d{4}-(0[1-9]|1[0-2])$/.test(value) ? value : 'invalid'
+}
+
+async function albumTimeline(albumId: string, search: string) {
+    return run(`SELECT TO_CHAR(
+            CASE WHEN f.photo_taken_at IS NOT NULL
+                THEN (f.photo_taken_at AT TIME ZONE 'UTC')
+                    + COALESCE(f.photo_taken_offset_minutes,0) * INTERVAL '1 minute'
+                ELSE f.uploaded_at AT TIME ZONE 'UTC'
+            END,
+            'YYYY-MM'
+        ) AS month_key,
+        COUNT(*)::int AS photo_count
+        FROM photo_album_items pi JOIN files f ON f.id=pi.file_id
+        WHERE pi.album_id=$1
+          AND (f.type IN ('image/jpeg','image/png','image/gif','image/webp','image/avif','image/heic','image/heif',
+              'video/mp4','video/webm','video/ogg'))
+          AND ($2='' OR strpos(lower(f.name),lower($2))>0
+              OR strpos(lower(concat_ws(' ',f.location_label,f.latitude::text,f.longitude::text)),lower($2))>0)
+        GROUP BY 1 ORDER BY 1 DESC`, [albumId, search])
 }
 
 export async function listAlbums(req: FastifyRequest, res: FastifyReply) {
@@ -86,21 +110,38 @@ export async function getAlbum(req: FastifyRequest<{ Params: AlbumParams, Querys
     const limit = Math.min(Math.max(Number.parseInt(req.query.limit || '100', 10) || 100, 1), 100)
     const offset = Math.max(0, Math.min(1_000_000, Number.parseInt(req.query.offset || '0', 10) || 0))
     const search = typeof req.query.search === 'string' ? req.query.search.trim().slice(0, 120) : ''
-    const [items, total] = await Promise.all([run(`SELECT f.id,f.name,f.type,f.uploaded_at,f.photo_taken_at,
+    const month = validMonth(req.query.month)
+    if (month === 'invalid') return res.status(400).send({ error: 'Month must use YYYY-MM format.' })
+    const [items, total] = await Promise.all([run(`SELECT f.id,f.name,f.type,f.owner,f.is_favorite,f.uploaded_at,f.photo_taken_at,
         f.photo_taken_offset_minutes,f.location_label,f.latitude,f.longitude,
         COALESCE(f.storage_size,octet_length(f.data)) AS size_bytes, pi.added_at, pi.added_by
         FROM photo_album_items pi JOIN files f ON f.id=pi.file_id
-        WHERE pi.album_id=$1 AND ($4='' OR strpos(lower(f.name),lower($4))>0
+        WHERE pi.album_id=$1 AND f.type IN ('image/jpeg','image/png','image/gif','image/webp','image/avif','image/heic','image/heif',
+            'video/mp4','video/webm','video/ogg')
+          AND ($4='' OR strpos(lower(f.name),lower($4))>0
             OR strpos(lower(concat_ws(' ',f.location_label,f.latitude::text,f.longitude::text)),lower($4))>0)
-        ORDER BY COALESCE(f.photo_taken_at,f.uploaded_at) DESC,f.id LIMIT $2 OFFSET $3`, [id, limit, offset, search]),
+            AND ($5='' OR TO_CHAR(CASE WHEN f.photo_taken_at IS NOT NULL
+                THEN (f.photo_taken_at AT TIME ZONE 'UTC')
+                    + COALESCE(f.photo_taken_offset_minutes,0) * INTERVAL '1 minute'
+                ELSE f.uploaded_at AT TIME ZONE 'UTC' END,'YYYY-MM')=$5)
+        ORDER BY COALESCE(f.photo_taken_at,f.uploaded_at) DESC,f.id LIMIT $2 OFFSET $3`,
+    [id, limit, offset, search, month]),
     run(`SELECT COUNT(*)::int AS total FROM photo_album_items pi JOIN files f ON f.id=pi.file_id
-        WHERE pi.album_id=$1 AND ($2='' OR strpos(lower(f.name),lower($2))>0
-            OR strpos(lower(concat_ws(' ',f.location_label,f.latitude::text,f.longitude::text)),lower($2))>0)`, [id, search])])
+        WHERE pi.album_id=$1 AND f.type IN ('image/jpeg','image/png','image/gif','image/webp','image/avif','image/heic','image/heif',
+            'video/mp4','video/webm','video/ogg')
+          AND ($2='' OR strpos(lower(f.name),lower($2))>0
+            OR strpos(lower(concat_ws(' ',f.location_label,f.latitude::text,f.longitude::text)),lower($2))>0)
+            AND ($3='' OR TO_CHAR(CASE WHEN f.photo_taken_at IS NOT NULL
+                THEN (f.photo_taken_at AT TIME ZONE 'UTC')
+                    + COALESCE(f.photo_taken_offset_minutes,0) * INTERVAL '1 minute'
+                ELSE f.uploaded_at AT TIME ZONE 'UTC' END,'YYYY-MM')=$3)`, [id, search, month])])
+    const timeline = await albumTimeline(id, search)
     const members = access.owner
         ? await run('SELECT user_id,role,added_at FROM photo_album_members WHERE album_id=$1 ORDER BY user_id', [id])
         : null
     return res.send({ ...album.rows[0], role: access.owner ? 'owner' : access.role,
-        items: items.rows, total: total.rows[0].total, limit, offset, members: members?.rows })
+        items: items.rows, total: total.rows[0].total, limit, offset,
+        timeline: timeline.rows, month, members: members?.rows })
 }
 
 export async function updateAlbum(req: FastifyRequest<{ Params: AlbumParams }>, res: FastifyReply) {
@@ -215,22 +256,35 @@ export async function getPublicAlbum(req: FastifyRequest<{ Params: AlbumParams, 
     const limit = Math.min(Math.max(Number.parseInt(req.query.limit || '100', 10) || 100, 1), 100)
     const offset = Math.max(0, Math.min(1_000_000, Number.parseInt(req.query.offset || '0', 10) || 0))
     const search = typeof req.query.search === 'string' ? req.query.search.trim().slice(0, 120) : ''
+    const month = validMonth(req.query.month)
+    if (month === 'invalid') return res.status(400).send({ error: 'Month must use YYYY-MM format.' })
     const [items, total] = await Promise.all([run(`SELECT f.id,f.name,f.type,f.uploaded_at,f.photo_taken_at,
         f.photo_taken_offset_minutes,f.location_label,f.latitude,f.longitude,
         COALESCE(f.storage_size,octet_length(f.data)) AS size_bytes
         FROM photo_album_items pi JOIN files f ON f.id=pi.file_id
-        WHERE pi.album_id=$1 AND ($4='' OR strpos(lower(f.name),lower($4))>0
+        WHERE pi.album_id=$1 AND f.type IN ('image/jpeg','image/png','image/gif','image/webp','image/avif','image/heic','image/heif',
+            'video/mp4','video/webm','video/ogg')
+          AND ($4='' OR strpos(lower(f.name),lower($4))>0
             OR strpos(lower(concat_ws(' ',f.location_label,f.latitude::text,f.longitude::text)),lower($4))>0)
+            AND ($5='' OR TO_CHAR(CASE WHEN f.photo_taken_at IS NOT NULL
+                THEN (f.photo_taken_at AT TIME ZONE 'UTC')
+                    + COALESCE(f.photo_taken_offset_minutes,0) * INTERVAL '1 minute'
+                ELSE f.uploaded_at AT TIME ZONE 'UTC' END,'YYYY-MM')=$5)
         ORDER BY COALESCE(f.photo_taken_at,f.uploaded_at) DESC,f.id
-        LIMIT $2 OFFSET $3`, [album.rows[0].id, limit, offset, search]),
+        LIMIT $2 OFFSET $3`, [album.rows[0].id, limit, offset, search, month]),
     run(`SELECT COUNT(*)::int AS total
         FROM photo_album_items pi JOIN files f ON f.id=pi.file_id
-        WHERE pi.album_id=$1 AND (
+        WHERE pi.album_id=$1 AND f.type IN ('image/jpeg','image/png','image/gif','image/webp','image/avif','image/heic','image/heif',
+            'video/mp4','video/webm','video/ogg') AND (
             $2='' OR strpos(lower(f.name),lower($2))>0
             OR strpos(lower(concat_ws(' ',f.location_label,f.latitude::text,f.longitude::text)),lower($2))>0
-        )`, [album.rows[0].id, search])])
+        ) AND ($3='' OR TO_CHAR(CASE WHEN f.photo_taken_at IS NOT NULL
+            THEN (f.photo_taken_at AT TIME ZONE 'UTC')
+                + COALESCE(f.photo_taken_offset_minutes,0) * INTERVAL '1 minute'
+            ELSE f.uploaded_at AT TIME ZONE 'UTC' END,'YYYY-MM')=$3)`, [album.rows[0].id, search, month])])
+    const timeline = await albumTimeline(album.rows[0].id, search)
     return res.send({
         id: album.rows[0].id, name: album.rows[0].name, items: items.rows,
-        total: total.rows[0].total, limit, offset,
+        total: total.rows[0].total, limit, offset, timeline: timeline.rows, month,
     })
 }

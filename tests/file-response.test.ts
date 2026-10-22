@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'bun:test'
 import {
     getExifReaderScript,
+    getGalleryClientScript,
     getGalleryPage,
     getLoginPage,
     getUploadPage,
@@ -23,7 +24,7 @@ async function page(handler: typeof getUploadPage, request = {}) {
     return { html, headers }
 }
 
-async function script(handler: typeof getUploadPickerScript) {
+async function script(handler: typeof getUploadPickerScript | typeof getGalleryClientScript | typeof getExifReaderScript) {
     let body = ''
     const reply = {
         header: () => reply,
@@ -131,13 +132,13 @@ describe('standalone CDN pages', () => {
         const authScript = scripts[0]?.[1]
         const uploadScript = scripts.at(-1)?.[1]
 
-        expect(authScript).toContain('window.cdnAuth = Promise.resolve(null)')
+        expect(authScript).toContain("window.cdnAuth = fetch('/api/auth/session'")
         expect(uploadScript).toBeDefined()
         expect(() => new Function(uploadScript!)).not.toThrow()
         expect(html).toContain('id="upload-hint" class="upload-hint">Sign in to upload multiple files at once.')
         expect(html).toContain('<div class="picker-fallback" aria-hidden="true">')
         expect(html).toContain('picker-fallback-dropzone')
-        expect(html).not.toContain('/api/auth/session')
+        expect(html).toContain('/api/auth/session')
         expect(html).not.toContain('customElements.whenDefined')
         expect(html).not.toContain('hint.hidden')
     })
@@ -149,6 +150,7 @@ describe('standalone CDN pages', () => {
         const { html: upload, headers: uploadHeaders } = uploadPage
         const { html: gallery, headers: galleryHeaders } = galleryPage
         const { html: login, headers: loginHeaders } = loginPage
+        const galleryClient = await script(getGalleryClientScript)
 
         const uploadScripts = Array.from(upload.matchAll(/<script>([\s\S]*?)<\/script>/g))
         expect(uploadScripts.length).toBeGreaterThan(0)
@@ -178,25 +180,23 @@ describe('standalone CDN pages', () => {
         expect(upload).toContain('await wait(1000)')
         expect(upload).toContain('const batch = files.slice(start, end)')
         expect(upload).toContain('for (const file of batch) data.append(\'files\', file, file.name)')
-        expect(gallery).toContain('\'/api/files/user/\' + encodeURIComponent(auth.id)')
         expect(upload).toContain('const fileUrl = id => \'/api/files/\' + encodeURIComponent(id)')
-        expect(gallery).toContain('const fileUrl = id => \'/api/files/\' + encodeURIComponent(id)')
         expect(upload).not.toContain('link.href = \'/files/\'')
-        expect(gallery).not.toContain('link.href = \'/files/\'')
-        expect(gallery).toContain('.gallery {')
-        expect(gallery).toContain('justify-content: start;')
-        expect(gallery).toContain('aria-busy="true" class="gallery"')
+        expect(gallery).toContain('id="photo-library"')
+        expect(gallery).toContain('id="photo-search"')
+        expect(gallery).toContain('id="date-timeline"')
+        expect(gallery).toContain('/assets/gallery.js')
+        expect(galleryClient).toContain("const fileUrl = id => '/api/files/' + encodeURIComponent(id)")
+        expect(galleryClient).toContain('/timeline')
+        expect(galleryClient).toContain('photo-favorite')
+        expect(galleryClient).toContain('button.dataset.view')
+        expect(galleryClient).toContain('searchLibrary')
         expect(gallery).toContain('class="loading-indicator"')
-        expect(gallery).toContain('if (!offset) root.replaceChildren()')
         expect(gallery).not.toContain('Loading…')
         expect(gallery).not.toContain('Your uploaded files and share links.')
         expect(gallery).not.toContain('aria-label="Hanasand CDN"')
         expect(gallery).toContain('class="photo-viewer"')
-        expect(gallery).toContain('viewer.showModal()')
-        expect(gallery).toContain('viewerImage.src = url')
-        expect(gallery).toContain('const movePhoto = step =>')
-        const galleryScripts = Array.from(gallery.matchAll(/<script>([\s\S]*?)<\/script>/g))
-        expect(() => new Function(galleryScripts.at(-1)![1])).not.toThrow()
+        expect(() => new Function(galleryClient)).not.toThrow()
         expect(login).toContain('main.login-page { width: min(100%, 18rem);')
         expect(login).toContain('.login-field { display: grid; gap: 1.25rem; }')
         expect(login).toContain('.login-form label { margin: 0; }')
@@ -207,14 +207,13 @@ describe('standalone CDN pages', () => {
         expect(login).toContain('button:focus-visible, a:focus-visible, input:focus-visible')
         expect(login).toContain('outline: 2px solid #999;')
         expect(login).toContain('input:focus-visible { outline-color: #707070; outline-offset: 2px; }')
-        expect(gallery).toContain('preview.src = url')
-        expect(gallery).toContain('summary.append(preview)')
-        expect(gallery).toContain('details.append(summary, info)')
-        expect(gallery).toContain('info.append(name, meta, link)')
-        expect(gallery).toContain('?limit=100&offset=')
+        expect(galleryClient).toContain('preview.src = fileUrl(file.id)')
+        expect(galleryClient).toContain('viewer.showModal()')
+        expect(galleryClient).toContain('viewerImage.src = url')
+        expect(galleryClient).toContain('const movePhoto = step =>')
+        expect(galleryClient).toContain('?limit=100&offset=')
         expect(gallery).toContain('Load more')
-        expect(gallery).not.toContain('link.textContent = file.name')
-        expect(gallery).toContain('location.replace(\'/login?returnTo=\'')
+        expect(galleryClient).toContain('location.replace(\'/login?returnTo=\'')
         expect(upload).not.toContain('https://hanasand.com/upload')
         expect(gallery).not.toContain('https://hanasand.com/gallery')
         expect(login).toContain('fetch(\'/api/auth/login\'')

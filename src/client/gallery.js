@@ -1,4 +1,4 @@
-/* global window, document, location, navigator, fetch, Option, clearTimeout, setTimeout */
+/* global window, document, location, navigator, fetch, Option, URLSearchParams, clearTimeout, setTimeout */
 (() => {
     const page = document.querySelector('#photo-library')
     if (!page) return
@@ -23,10 +23,24 @@
     const state = {
         files: [], allFiles: [], recentFiles: [], albums: [], activeAlbum: null,
         view: 'library', selected: new Set(), offset: 0, recentOffset: 0,
-        albumOffset: 0, photos: [], photoIndex: 0, search: '', searchRequest: 0,
+        albumOffset: 0, photos: [], photoIndex: 0, search: '', month: '', months: [], searchRequest: 0,
     }
     const fileUrl = id => '/api/files/' + encodeURIComponent(id)
-    const withSearch = url => state.search ? `${url}&search=${encodeURIComponent(state.search)}` : url
+    const appendQuery = (url, params) => params.size
+        ? `${url}${url.includes('?') ? '&' : '?'}${params}` : url
+    const withSearch = url => {
+        const filters = new URLSearchParams()
+        if (state.search) filters.set('search', state.search)
+        if (!isPublic && state.view === 'favorites') filters.set('favorites', 'true')
+        if (!isPublic) filters.set('media',
+            state.view === 'images' || state.view === 'videos' ? state.view : 'all')
+        return appendQuery(url, filters)
+    }
+    const withFilters = url => {
+        const filteredUrl = withSearch(url)
+        if (!state.month) return filteredUrl
+        return appendQuery(filteredUrl, new URLSearchParams({ month: state.month }))
+    }
     const api = async (url, options = {}) => {
         const response = await fetch(url, {
             credentials: 'same-origin', cache: 'no-store', ...options,
@@ -93,7 +107,11 @@
         dateTimeline.replaceChildren()
         const dated = files.map(file => ({ file, date: photoDate(file) }))
             .filter(item => !Number.isNaN(item.date.getTime()))
-        if (!dated.length) {
+        const months = state.months.length
+            ? state.months
+            : [...new Set(dated.map(item => monthKey(item.file)).filter(Boolean))]
+                .map(month_key => ({ month_key, photo_count: 0 }))
+        if (!dated.length && !months.length) {
             dateTimeline.hidden = true
             return
         }
@@ -107,12 +125,20 @@
         range.className = 'date-range'
         const first = dated[0]
         const last = dated.at(-1)
-        const parts = ({ file, date }) => file.photo_taken_at
-            ? [date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()]
-            : [date.getFullYear(), date.getMonth(), date.getDate()]
-        const sameDay = parts(first).every((part, index) => part === parts(last)[index])
-        range.textContent = sameDay
-            ? formatRangeDate(first) : `${formatRangeDate(first)} – ${formatRangeDate(last)}`
+        if (months.length > 1) {
+            const monthDate = key => new Date(`${key}-01T00:00:00Z`)
+            const monthLabel = key => new Intl.DateTimeFormat(undefined, {
+                month: 'long', year: 'numeric', timeZone: 'UTC',
+            }).format(monthDate(key))
+            range.textContent = `${monthLabel(months.at(-1).month_key)} – ${monthLabel(months[0].month_key)}`
+        } else if (first && last) {
+            const parts = ({ file, date }) => file.photo_taken_at
+                ? [date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()]
+                : [date.getFullYear(), date.getMonth(), date.getDate()]
+            const sameDay = parts(first).every((part, index) => part === parts(last)[index])
+            range.textContent = sameDay
+                ? formatRangeDate(first) : `${formatRangeDate(first)} – ${formatRangeDate(last)}`
+        }
         const places = [...new Set(files.map(locationLabel).filter(Boolean))]
         if (places.length === 1) {
             const place = document.createElement('p')
@@ -123,20 +149,17 @@
         const navigation = document.createElement('nav')
         navigation.className = 'timeline-months'
         navigation.setAttribute('aria-label', 'Jump to month')
-        const seen = new Set()
-        for (const { file, date } of [...dated].reverse()) {
-            const key = monthKey(file)
-            if (!key || seen.has(key)) continue
-            seen.add(key)
+        for (const { month_key, photo_count } of months) {
+            const key = month_key
             const button = document.createElement('button')
             button.type = 'button'
             button.textContent = new Intl.DateTimeFormat(undefined, {
-                month: 'short', year: 'numeric', ...(file.photo_taken_at ? { timeZone: 'UTC' } : {}),
-            }).format(date)
-            button.addEventListener('click', () => {
-                const group = [...root.querySelectorAll('.photo-group')]
-                    .find(section => section.dataset.monthKey === key)
-                group?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+                month: 'short', year: 'numeric', timeZone: 'UTC',
+            }).format(new Date(`${key}-01T00:00:00Z`)) + (photo_count ? ` · ${photo_count}` : '')
+            button.setAttribute('aria-pressed', state.month === key ? 'true' : 'false')
+            button.addEventListener('click', async () => {
+                state.month = state.month === key ? '' : key
+                await searchLibrary(state.search)
             })
             navigation.append(button)
         }
@@ -165,6 +188,13 @@
         selectionCount.hidden = !count
         selectionCount.textContent = count ? `${count} selected` : ''
         addButton.disabled = count === 0 || !albumTarget.value
+    }
+    const matchingPhotoCount = () => state.month
+        ? Number(state.months.find(item => item.month_key === state.month)?.photo_count || 0)
+        : state.months.reduce((total, item) => total + Number(item.photo_count || 0), 0)
+    const updateUserLoadMore = () => {
+        const offset = state.view === 'recent' ? state.recentOffset : state.offset
+        loadMore.hidden = offset >= matchingPhotoCount()
     }
     const appendMeta = (container, icon, label, value) => {
         if (!value) return
@@ -257,7 +287,12 @@
         if (!filtered.length) {
             const empty = document.createElement('p')
             empty.className = 'muted'
-            empty.textContent = state.search ? 'No matching photos.' : state.activeAlbum ? 'This album is empty.' : 'No photos yet.'
+            const emptyLabels = {
+                recent: 'No recent uploads.', favorites: 'No favorites yet.',
+                images: 'No images yet.', videos: 'No videos yet.',
+            }
+            empty.textContent = state.search ? 'No matching photos.'
+                : state.activeAlbum ? 'This album is empty.' : emptyLabels[state.view] || 'No photos yet.'
             root.append(empty)
             return
         }
@@ -308,6 +343,40 @@
                 const photoIndex = state.photos.indexOf(file)
                 open.addEventListener('click', () => openPhoto(photoIndex))
                 card.append(open)
+                if (!isPublic && file.owner === window.cdnAuthUser?.id) {
+                    const favorite = document.createElement('button')
+                    favorite.className = 'photo-favorite'
+                    favorite.type = 'button'
+                    favorite.textContent = file.is_favorite ? '♥' : '♡'
+                    favorite.setAttribute(
+                        'aria-label', file.is_favorite ? `Remove ${file.name} from favorites` : `Add ${file.name} to favorites`,
+                    )
+                    favorite.setAttribute('aria-pressed', file.is_favorite ? 'true' : 'false')
+                    favorite.addEventListener('click', async event => {
+                        event.stopPropagation()
+                        const result = await api(`/api/files/${encodeURIComponent(file.id)}/favorite`, {
+                            method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ favorite: !file.is_favorite }),
+                        })
+                        file.is_favorite = result.favorite
+                        if (state.view === 'favorites' && !file.is_favorite) {
+                            state.allFiles = state.allFiles.filter(item => item.id !== file.id)
+                            state.files = state.allFiles
+                            state.offset = Math.max(0, state.offset - 1)
+                            state.months = await api(withSearch(
+                                `/api/files/user/${encodeURIComponent(window.cdnAuthUser.id)}/timeline`,
+                            ))
+                            updateUserLoadMore()
+                            renderFiles()
+                        } else {
+                            favorite.textContent = file.is_favorite ? '♥' : '♡'
+                            favorite.setAttribute('aria-label', file.is_favorite
+                                ? `Remove ${file.name} from favorites` : `Add ${file.name} to favorites`)
+                            favorite.setAttribute('aria-pressed', file.is_favorite ? 'true' : 'false')
+                        }
+                    })
+                    card.append(favorite)
+                }
                 if (!isPublic) {
                     const checkbox = document.createElement('input')
                     checkbox.type = 'checkbox'
@@ -333,6 +402,9 @@
                             const albumId = encodeURIComponent(state.activeAlbum.id)
                             await api(`/api/albums/${albumId}/items/${encodeURIComponent(file.id)}`, { method: 'DELETE' })
                             state.files = state.files.filter(item => item.id !== file.id)
+                            state.albumOffset = Math.max(0, state.albumOffset - 1)
+                            state.activeAlbum.total = Math.max(0, state.activeAlbum.total - 1)
+                            loadMore.hidden = state.albumOffset >= state.activeAlbum.total
                             renderFiles()
                         })
                         card.append(remove)
@@ -348,8 +420,9 @@
     const openAlbum = async id => {
         state.searchRequest++
         try {
-            const album = await api(withSearch(`/api/albums/${encodeURIComponent(id)}?limit=100&offset=0`))
+            const album = await api(withFilters(`/api/albums/${encodeURIComponent(id)}?limit=100&offset=0`))
             state.activeAlbum = album
+            state.months = album.timeline || []
             state.view = 'album'
             state.files = album.items
             state.albumOffset = album.items.length
@@ -478,10 +551,17 @@
                 state.albums = state.albums.filter(item => item.id !== album.id)
                 state.activeAlbum = null
                 state.view = 'library'
-                state.files = state.allFiles
                 title.textContent = 'Library'
                 manageButton.hidden = true
-                loadMore.hidden = state.offset < 100
+                const [files, months] = await Promise.all([
+                    api(withFilters(`/api/files/user/${encodeURIComponent(window.cdnAuthUser.id)}?limit=100&offset=0`)),
+                    api(withSearch(`/api/files/user/${encodeURIComponent(window.cdnAuthUser.id)}/timeline`)),
+                ])
+                state.allFiles = files
+                state.files = files
+                state.months = months
+                state.offset = files.length
+                updateUserLoadMore()
                 dialog.close()
                 renderSidebar()
                 renderFiles()
@@ -520,37 +600,40 @@
         state.view = button.dataset.view
         state.activeAlbum = null
         state.selected.clear()
-        title.textContent = state.view === 'recent' ? 'Recent' : 'Library'
+        const viewTitles = {
+            library: 'Library', recent: 'Recent', favorites: 'Favorites', images: 'Images', videos: 'Videos',
+        }
+        title.textContent = viewTitles[state.view] || 'Library'
         document.querySelectorAll('.library-nav').forEach(item => item.setAttribute('aria-current', item === button ? 'page' : 'false'))
         manageButton.hidden = true
         updateSelection()
-        if (state.search || (state.view === 'recent' && !state.recentFiles.length)) {
-            root.replaceChildren(Object.assign(document.createElement('span'), {
-                className: 'loading-indicator',
-            }))
-            root.setAttribute('aria-busy', 'true')
-            page.setAttribute('aria-busy', 'true')
-            try {
-                if (state.view === 'recent') {
-                    state.recentFiles = await api(
-                        withSearch(`/api/files/user/${encodeURIComponent(window.cdnAuthUser.id)}?sort=uploaded&limit=100&offset=0`),
-                    )
-                    state.recentOffset = state.recentFiles.length
-                } else {
-                    state.allFiles = await api(
-                        withSearch(`/api/files/user/${encodeURIComponent(window.cdnAuthUser.id)}?limit=100&offset=0`),
-                    )
-                    state.offset = state.allFiles.length
-                }
-            } catch (error) {
-                showError(error.message)
-                return
+        root.replaceChildren(Object.assign(document.createElement('span'), {
+            className: 'loading-indicator',
+        }))
+        root.setAttribute('aria-busy', 'true')
+        page.setAttribute('aria-busy', 'true')
+        try {
+            const recent = state.view === 'recent'
+            const sort = recent ? 'sort=uploaded&' : ''
+            const filesUrl = `/api/files/user/${encodeURIComponent(window.cdnAuthUser.id)}?${sort}limit=100&offset=0`
+            const [files, months] = await Promise.all([
+                api(withFilters(filesUrl)),
+                api(withSearch(`/api/files/user/${encodeURIComponent(window.cdnAuthUser.id)}/timeline`)),
+            ])
+            if (recent) {
+                state.recentFiles = files
+                state.recentOffset = files.length
+            } else {
+                state.allFiles = files
+                state.offset = files.length
             }
+            state.months = months
+            state.files = files
+            updateUserLoadMore()
+            renderFiles()
+        } catch (error) {
+            showError(error.message)
         }
-        state.files = state.view === 'recent' ? state.recentFiles : state.allFiles
-        loadMore.hidden = state.view === 'recent'
-            ? state.recentFiles.length < 100 : state.offset < 100
-        renderFiles()
     }))
     let searchTimer
     searchInput?.addEventListener('input', () => {
@@ -570,34 +653,44 @@
         loadMore.hidden = true
         try {
             if (isPublic) {
-                const album = await api(withSearch(`/api/albums/public/${encodeURIComponent(publicToken)}?limit=100&offset=0`))
+                const album = await api(withFilters(`/api/albums/public/${encodeURIComponent(publicToken)}?limit=100&offset=0`))
                 if (request !== state.searchRequest) return
                 state.activeAlbum = album
                 state.files = album.items
                 state.albumOffset = album.items.length
+                state.months = album.timeline || []
                 loadMore.hidden = state.albumOffset >= album.total
             } else if (state.view === 'album' && state.activeAlbum) {
-                const album = await api(withSearch(`/api/albums/${encodeURIComponent(state.activeAlbum.id)}?limit=100&offset=0`))
+                const album = await api(withFilters(`/api/albums/${encodeURIComponent(state.activeAlbum.id)}?limit=100&offset=0`))
                 if (request !== state.searchRequest) return
                 state.activeAlbum = album
                 state.files = album.items
                 state.albumOffset = album.items.length
+                state.months = album.timeline || []
                 loadMore.hidden = state.albumOffset >= album.total
             } else if (state.view === 'recent') {
                 const url = `/api/files/user/${encodeURIComponent(window.cdnAuthUser.id)}?sort=uploaded&limit=100&offset=0`
-                const files = await api(withSearch(url))
+                const [files, months] = await Promise.all([
+                    api(withFilters(url)),
+                    api(withSearch(`/api/files/user/${encodeURIComponent(window.cdnAuthUser.id)}/timeline`)),
+                ])
                 if (request !== state.searchRequest) return
                 state.recentFiles = files
                 state.files = files
                 state.recentOffset = files.length
-                loadMore.hidden = files.length < 100
+                state.months = months
+                updateUserLoadMore()
             } else {
-                const files = await api(withSearch(`/api/files/user/${encodeURIComponent(window.cdnAuthUser.id)}?limit=100&offset=0`))
+                const [files, months] = await Promise.all([
+                    api(withFilters(`/api/files/user/${encodeURIComponent(window.cdnAuthUser.id)}?limit=100&offset=0`)),
+                    api(withSearch(`/api/files/user/${encodeURIComponent(window.cdnAuthUser.id)}/timeline`)),
+                ])
                 if (request !== state.searchRequest) return
                 state.allFiles = files
                 state.files = files
                 state.offset = files.length
-                loadMore.hidden = files.length < 100
+                state.months = months
+                updateUserLoadMore()
             }
             if (request === state.searchRequest) renderFiles()
         } catch (error) {
@@ -615,10 +708,11 @@
             loadMore.disabled = true
             try {
                 const url = `/api/albums/public/${encodeURIComponent(publicToken)}?limit=100&offset=${state.albumOffset}`
-                const next = await api(withSearch(url))
+                const next = await api(withFilters(url))
                 state.files.push(...next.items)
                 state.albumOffset += next.items.length
                 state.activeAlbum = next
+                state.months = next.timeline || state.months
                 loadMore.hidden = state.albumOffset >= next.total
                 renderFiles()
             } finally { loadMore.disabled = false }
@@ -629,14 +723,14 @@
             loadMore.disabled = true
             try {
                 const next = await api(
-                    withSearch(
+                    withFilters(
                         `/api/files/user/${encodeURIComponent(window.cdnAuthUser.id)}?sort=uploaded&limit=100&offset=${state.recentOffset}`,
                     ),
                 )
                 state.recentOffset += next.length
                 state.recentFiles.push(...next)
                 state.files = state.recentFiles
-                loadMore.hidden = next.length < 100
+                updateUserLoadMore()
                 renderFiles()
             } finally { loadMore.disabled = false }
             return
@@ -645,9 +739,10 @@
             loadMore.disabled = true
             try {
                 const url = `/api/albums/${encodeURIComponent(state.activeAlbum.id)}?limit=100&offset=${state.albumOffset}`
-                const next = await api(withSearch(url))
+                const next = await api(withFilters(url))
                 state.files.push(...next.items)
                 state.activeAlbum = { ...next, items: state.files }
+                state.months = next.timeline || state.months
                 state.albumOffset += next.items.length
                 loadMore.hidden = state.albumOffset >= next.total
                 renderFiles()
@@ -657,20 +752,21 @@
         loadMore.disabled = true
         try {
             const url = `/api/files/user/${encodeURIComponent(window.cdnAuthUser.id)}?limit=100&offset=${state.offset}`
-            const next = await api(withSearch(url))
+            const next = await api(withFilters(url))
             state.offset += next.length
             state.allFiles.push(...next)
             state.files = state.allFiles
-            loadMore.hidden = next.length < 100
+            updateUserLoadMore()
             renderFiles()
         } finally { loadMore.disabled = false }
     }
     if (isPublic) {
         document.querySelector('.library-sidebar')?.remove()
         page.style.gridTemplateColumns = 'minmax(0,1fr)'
-        Promise.all([api(withSearch(`/api/albums/public/${encodeURIComponent(publicToken)}?limit=100&offset=0`))]).then(([album]) => {
+        Promise.all([api(withFilters(`/api/albums/public/${encodeURIComponent(publicToken)}?limit=100&offset=0`))]).then(([album]) => {
             title.textContent = album.name
             state.files = album.items
+            state.months = album.timeline || []
             state.albumOffset = album.items.length
             state.activeAlbum = album
             loadMore.hidden = state.albumOffset >= album.total
@@ -680,14 +776,16 @@
         window.cdnAuth.then(async auth => {
             if (!auth?.id) return location.replace('/login?returnTo=%2Fgallery')
             window.cdnAuthUser = auth
-            const [, files] = await Promise.all([
+            const [, files, months] = await Promise.all([
                 loadAlbums(),
                 api(`/api/files/user/${encodeURIComponent(auth.id)}?limit=100&offset=0`),
+                api(`/api/files/user/${encodeURIComponent(auth.id)}/timeline`),
             ])
             state.allFiles = files
             state.files = files
+            state.months = months
             state.offset = files.length
-            loadMore.hidden = files.length < 100
+            updateUserLoadMore()
             renderFiles()
         }).catch(error => showError(error.message || 'The photo library could not be loaded.'))
     }

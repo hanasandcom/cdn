@@ -12,6 +12,9 @@ type UserFilesQuery = {
     offset?: string
     sort?: string
     search?: string
+    month?: string
+    favorites?: string
+    media?: string
 }
 
 export default async function getUserFiles(
@@ -44,19 +47,41 @@ export default async function getUserFiles(
         ? 'uploaded_at DESC, id DESC'
         : 'COALESCE(photo_taken_at,uploaded_at) DESC, id DESC'
     const search = typeof req.query.search === 'string' ? req.query.search.trim().slice(0, 120) : ''
+    const month = req.query.month ? req.query.month : ''
+    if (month && !/^\d{4}-(0[1-9]|1[0-2])$/.test(month)) {
+        return res.status(400).send({ error: 'Month must use YYYY-MM format.' })
+    }
+    const favorites = req.query.favorites === 'true' ? 'true' : ''
+    const media = req.query.media || ''
+    if (media && media !== 'all' && media !== 'images' && media !== 'videos') {
+        return res.status(400).send({ error: 'media must be all, images, or videos.' })
+    }
 
     try {
         const result = await run(
             `SELECT id, name, description, type, path, owner, uploaded_at,
-                    photo_taken_at, photo_taken_offset_minutes, location_label, latitude, longitude,
+                    photo_taken_at, photo_taken_offset_minutes, location_label, latitude, longitude, is_favorite,
                     COALESCE(storage_size,octet_length(data)) AS size_bytes
              FROM files
              WHERE owner = $1
                AND ($4 = '' OR strpos(lower(name),lower($4)) > 0
                     OR strpos(lower(concat_ws(' ',location_label,latitude::text,longitude::text)),lower($4)) > 0)
+               AND ($5 = '' OR TO_CHAR(
+                    CASE WHEN photo_taken_at IS NOT NULL
+                        THEN (photo_taken_at AT TIME ZONE 'UTC')
+                            + COALESCE(photo_taken_offset_minutes,0) * INTERVAL '1 minute'
+                        ELSE uploaded_at AT TIME ZONE 'UTC'
+                    END, 'YYYY-MM')=$5)
+               AND ($6 = '' OR is_favorite)
+               AND ($7 = '' OR ($7='all' AND type IN (
+                        'image/jpeg','image/png','image/gif','image/webp','image/avif','image/heic','image/heif',
+                        'video/mp4','video/webm','video/ogg'
+                    )) OR ($7='images' AND type IN (
+                        'image/jpeg','image/png','image/gif','image/webp','image/avif','image/heic','image/heif'
+                    )) OR ($7='videos' AND type IN ('video/mp4','video/webm','video/ogg')))
              ORDER BY ${order}
              LIMIT $2 OFFSET $3`,
-            [id, limit, offset, search]
+            [id, limit, offset, search, month, favorites, media]
         )
 
         return res.send(result.rows)

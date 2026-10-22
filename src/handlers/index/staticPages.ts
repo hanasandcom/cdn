@@ -35,7 +35,11 @@ const styles = `
 body { margin: 0; min-height: 100vh; padding: 2rem 1rem; display: grid; place-items: center; }
 main { width: min(100%, 58rem); padding: 2rem; border: 1px solid #393939; border-radius: 1rem; background: #101010; }
 main.login-page { width: min(100%, 18rem); max-width: 18rem; padding: 1.25rem; }
-main.gallery-page { width: min(100%, 96rem); }
+body.gallery-body { display: block; padding: 0; background: #1c1c1e; }
+main.gallery-page {
+    width: 100%; max-width: none; min-height: 100vh; padding: 0; border: 0;
+    border-radius: 0; background: #1c1c1e;
+}
 main.gallery-page > h1 { display: none; }
 a { color: inherit; }
 header { display: flex; justify-content: space-between; align-items: center; gap: 1rem; }
@@ -150,9 +154,18 @@ hanasand-upload-picker:defined > .picker-fallback { display: none; }
 .viewer-info h2 { margin: .25rem 0 1rem; overflow-wrap: anywhere; font-size: 1rem; }
 .viewer-info p { overflow-wrap: anywhere; }
 .viewer-download { display: inline-flex; margin-top: 1rem; }
-.photo-library-layout { display: grid; grid-template-columns: 14rem minmax(0, 1fr); gap: 1.5rem; min-height: 70vh; margin-top: 1.5rem; }
+.gallery-page > header {
+    position: sticky; z-index: 5; top: 0; min-height: 3.5rem; padding: .55rem 1.25rem;
+    border-bottom: 1px solid #343436; background: #303033; color: #eee;
+}
+.gallery-page > header nav { margin-left: auto; font-size: .9rem; }
+.photo-library-layout { display: grid; grid-template-columns: 16rem minmax(0, 1fr); gap: 0; min-height: calc(100vh - 3.5rem); margin: 0; }
 .public-library { grid-template-columns: minmax(0, 1fr); }
-.library-sidebar { display: grid; align-content: start; gap: 1.25rem; padding-right: 1rem; border-right: 1px solid #303030; }
+.library-sidebar {
+    position: sticky; top: 3.5rem; display: grid; height: calc(100vh - 3.5rem); overflow-y: auto;
+    align-content: start; gap: 1.25rem; padding: 1.25rem .85rem;
+    border-right: 1px solid #343436; background: #202023;
+}
 .library-section { display: grid; gap: .35rem; }
 .library-section h2 { margin: 0 0 .25rem; color: #999; font-size: .72rem; letter-spacing: .08em; text-transform: uppercase; }
 .library-nav, .album-nav {
@@ -167,13 +180,13 @@ hanasand-upload-picker:defined > .picker-fallback { display: none; }
     width: 100%; margin-top: .3rem; border: 1px solid #3a3a3a;
     background: #202020; color: #eee; padding: .55rem; font-size: .8rem;
 }
-.library-content { min-width: 0; }
-.library-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 1rem; margin-bottom: 1rem; }
-.library-toolbar h2 { margin: 0; font-size: 1.2rem; }
+.library-content { min-width: 0; padding: 1.15rem 1.35rem 2.5rem; }
+.library-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 1rem; margin-bottom: 1.15rem; }
+.library-toolbar h2 { margin: 0; font-size: 1.35rem; }
 .library-actions { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem; }
 .library-actions input { width: min(15rem, 35vw); min-height: 2.4rem; padding: .5rem .7rem; font-size: .82rem; }
-.date-timeline { display: grid; gap: .55rem; margin: .25rem 0 1.25rem; }
-.date-range { margin: 0; color: #eee; font-size: 1rem; font-weight: 650; }
+.date-timeline { display: grid; gap: .4rem; margin: .25rem 0 1rem; }
+.date-range { margin: 0; color: #eee; font-size: 1.2rem; font-weight: 650; }
 .date-location { margin: -.4rem 0 0; color: #999; font-size: .82rem; }
 .timeline-months { display: flex; gap: .35rem; overflow-x: auto; padding: .1rem 0 .35rem; }
 .timeline-months button {
@@ -181,26 +194,36 @@ hanasand-upload-picker:defined > .picker-fallback { display: none; }
     background: #171717; color: #bbb; padding: .35rem .65rem; font-size: .75rem;
 }
 .timeline-months button:hover, .timeline-months button:focus-visible { background: #303030; color: #fff; }
+.timeline-months button[aria-pressed="true"] { background: #f6f6f3; border-color: #f6f6f3; color: #111; }
 .library-actions button, .library-actions select, .album-dialog button {
     min-height: 2.4rem; border: 1px solid #3b3b3b; border-radius: .55rem;
     background: #202020; color: #eee; padding: .5rem .7rem; font-size: .82rem;
 }
 .library-actions button:disabled { opacity: .5; }
-.photo-group { margin: 1.5rem 0 2rem; }
+.photo-group { margin: 1.25rem 0 2rem; }
 .photo-group-heading { display: flex; align-items: baseline; gap: .75rem; margin: 0 0 .75rem; }
 .photo-group-heading h3 { margin: 0; font-size: 1rem; }
 .photo-group-heading span { color: #999; font-size: .85rem; }
-.photo-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(8rem, 1fr)); gap: .4rem; align-content: start; }
+.photo-grid {
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 13rem), 1fr));
+    gap: 1.6rem 2.25rem; align-content: start;
+}
 .library-grid { display: grid; align-content: start; }
 .library-grid[aria-busy="true"] { min-height: 18rem; place-items: center; }
 .library-grid > .loading-indicator { grid-column: 1 / -1; }
-.photo-card { position: relative; min-width: 0; aspect-ratio: 1; overflow: hidden; border-radius: .25rem; background: #171717; }
-.photo-card > button { display: block; width: 100%; height: 100%; padding: 0; border: 0; background: transparent; }
+.photo-card { position: relative; min-width: 0; aspect-ratio: 1; overflow: hidden; border-radius: .2rem; background: #171717; }
+.photo-card > button:not(.photo-favorite) { display: block; width: 100%; height: 100%; padding: 0; border: 0; background: transparent; }
 .photo-card .preview { width: 100%; height: 100%; aspect-ratio: auto; object-fit: cover; transition: transform .18s ease; }
 .photo-card > button:hover .preview { transform: scale(1.035); }
 .photo-select { position: absolute; top: .45rem; left: .45rem; width: 1.2rem; height: 1.2rem; accent-color: #5e9cff; opacity: 0; }
 .photo-card:hover .photo-select, .photo-select:focus-visible, .photo-select:checked { opacity: 1; }
 .photo-select:checked { width: 1.25rem; height: 1.25rem; }
+.photo-favorite {
+    position: absolute; top: .35rem; right: .35rem; display: grid;
+    width: 1.8rem; height: 1.8rem; place-items: center; border: 1px solid #555;
+    border-radius: 50%; background: #111d; color: #fff; padding: 0; font-size: 1rem;
+}
+.photo-favorite[aria-pressed="true"] { color: #ff6b87; }
 .album-remove {
     position: absolute; top: .35rem; right: .35rem; display: grid;
     width: 1.8rem; height: 1.8rem; place-items: center; border: 1px solid #555;
@@ -225,19 +248,20 @@ hanasand-upload-picker:defined > .picker-fallback { display: none; }
     main.login-page { padding: 1rem; }
     main.login-page header { align-items: flex-start; flex-direction: column; gap: .5rem; }
     main.login-page header nav { align-self: flex-end; }
-    main.gallery-page { padding: 1rem; }
-    .photo-library-layout { grid-template-columns: minmax(0, 1fr); gap: 1rem; }
+    .gallery-page > header { min-height: 3rem; padding: .5rem .8rem; }
+    .photo-library-layout { grid-template-columns: minmax(0, 1fr); gap: 0; min-height: calc(100vh - 3rem); }
     .library-sidebar {
         grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .75rem;
-        padding-right: 0; padding-bottom: .75rem; border-right: 0;
-        border-bottom: 1px solid #303030;
+        position: static; height: auto; overflow: visible; padding: .75rem .8rem;
+        border-right: 0; border-bottom: 1px solid #343436;
     }
     .library-section { min-width: 0; }
     .library-section:first-child { grid-column: 1 / -1; }
     .library-nav, .album-nav { padding: .5rem; }
+    .library-content { padding: .9rem .8rem 2rem; }
     .library-toolbar { align-items: flex-start; flex-direction: column; }
     .library-actions input { width: 100%; }
-    .photo-grid { grid-template-columns: repeat(auto-fill, minmax(6rem, 1fr)); }
+    .photo-grid { grid-template-columns: repeat(auto-fill, minmax(6rem, 1fr)); gap: .5rem; }
     .photo-viewer { width: 100vw; height: 100dvh; border: 0; border-radius: 0; }
     .viewer-layout { grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1fr) auto; }
     .viewer-info { max-height: 30dvh; border-top: 1px solid #393939; border-left: 0; padding: .75rem 1rem; }
@@ -254,6 +278,7 @@ hanasand-upload-picker:defined > .picker-fallback { display: none; }
 
 function shell(title: string, body: string, options: { mainClass?: string, showBrand?: boolean } = {}) {
     const brand = options.showBrand === false ? '' : '<a href="/" aria-label="Hanasand CDN">Hanasand CDN</a>'
+    const bodyClass = options.mainClass === 'gallery-page' ? 'gallery-body' : ''
     return `<!doctype html>
 <html lang="en">
 <meta charset="utf-8">
@@ -261,12 +286,14 @@ function shell(title: string, body: string, options: { mainClass?: string, showB
 <title>${title} · Hanasand CDN</title>
 <script src="https://api.hanasand.com/api/auth/device-proof-client.js"></script>
 <style>${styles}</style>
+<body class="${bodyClass}">
 <main class="${options.mainClass || ''}">
 <header>${brand}
 <nav><a href="/gallery">Gallery</a> · <a href="/upload">Upload</a></nav></header>
 <h1>${title}</h1>
 ${body}
 </main>
+</body>
 </html>`
 }
 
@@ -544,6 +571,10 @@ export async function getGalleryPage(_req: FastifyRequest, res: FastifyReply) {
 <div class="library-section"><h2>Library</h2>
 <button class="library-nav" data-view="library" aria-current="page"><span>▦</span> All photos</button>
 <button class="library-nav" data-view="recent"><span>◷</span> Recent</button></div>
+<div class="library-section"><h2>Collections</h2>
+<button class="library-nav" data-view="favorites"><span>♡</span> Favorites</button>
+<button class="library-nav" data-view="images"><span>▧</span> Images</button>
+<button class="library-nav" data-view="videos"><span>▷</span> Videos</button></div>
 <div class="library-section"><h2>Albums</h2><div id="owned-albums"></div>
 <button id="create-album" class="new-album" type="button">＋ New album</button></div>
 <div class="library-section"><h2>Shared with me</h2><div id="shared-albums"></div></div>
