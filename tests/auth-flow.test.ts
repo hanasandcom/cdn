@@ -121,8 +121,23 @@ describe('CDN Identity login proxies', () => {
 
         expect(res.payload).toEqual({ url: 'https://idp.example.test/authorize' })
         expect(res.headers['Set-Cookie']).toBe(
-            `hanasand_auth_binding=${binding}; Max-Age=600; Path=/; SameSite=Lax; HttpOnly; Secure; Domain=.hanasand.com`,
+            `hanasand_auth_binding=${binding}; Max-Age=600; Path=/; SameSite=None; HttpOnly; Secure; Domain=.hanasand.com`,
         )
+    })
+
+    test('generates an SSO binding when the shared form sends only its return path', async () => {
+        let sent: Record<string, unknown> | undefined
+        globalThis.fetch = (async (_input, init) => {
+            sent = JSON.parse(String(init?.body))
+            return Response.json({ url: 'https://idp.example.test/authorize' })
+        }) as typeof fetch
+        const res = reply()
+
+        await postSsoStart(request({ body: { redirectPath: '/gallery' } }) as never, res as never)
+
+        expect(sent?.redirectPath).toBe('https://cdn.hanasand.com/gallery')
+        expect(sent?.binding).toMatch(/^[A-Za-z0-9_-]{43}$/)
+        expect(String(res.headers['Set-Cookie'])).toContain('; HttpOnly; Secure; Domain=.hanasand.com')
     })
 
     test('matches Hanasand SSO GET flow with a same-site Identity callback and CDN return URL', async () => {
@@ -143,7 +158,7 @@ describe('CDN Identity login proxies', () => {
         expect(sent?.binding).toMatch(/^[A-Za-z0-9_-]{43}$/)
         expect(res.statusCode).toBe(303)
         expect(res.headers.Location).toBe('https://idp.example.test/authorize')
-        expect(String(res.headers['Set-Cookie'])).toContain('; HttpOnly; Secure; Domain=.hanasand.com')
+        expect(String(res.headers['Set-Cookie'])).toContain('; SameSite=None; HttpOnly; Secure; Domain=.hanasand.com')
     })
 
     test('puts all sign-in API paths under route rate limits', () => {

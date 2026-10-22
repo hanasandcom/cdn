@@ -65,9 +65,11 @@ export async function postSocialStart(req: FastifyRequest, res: FastifyReply) {
 }
 
 function authStartBody(value: unknown) {
-    if (!isRecord(value) || typeof value.binding !== 'string' || !/^[A-Za-z0-9_-]{43}$/.test(value.binding)) return null
+    if (!isRecord(value)) return null
+    const binding = value.binding === undefined ? randomBytes(32).toString('base64url') : value.binding
+    if (typeof binding !== 'string' || !/^[A-Za-z0-9_-]{43}$/.test(binding)) return null
     const redirectUrl = localRedirectUrl(value.redirectPath)
-    return { binding: value.binding, redirectPath: redirectUrl }
+    return { binding, redirectPath: redirectUrl }
 }
 
 function localRedirectUrl(value: unknown) {
@@ -76,7 +78,7 @@ function localRedirectUrl(value: unknown) {
     }
     try {
         const url = new URL(value, 'https://cdn.hanasand.com')
-        return url.origin === 'https://cdn.hanasand.com'
+        return url.origin === 'https://cdn.hanasand.com' && !url.username && !url.password
             ? url.href
             : 'https://cdn.hanasand.com/gallery'
     } catch {
@@ -200,7 +202,7 @@ function setAuthBindingCookie(req: FastifyRequest, res: FastifyReply, binding: u
     if (typeof binding !== 'string' || !/^[A-Za-z0-9_-]{43}$/.test(binding)) return false
     const hostname = String(req.headers.host || '').split(':')[0].toLowerCase()
     if (hostname !== 'cdn.hanasand.com') return false
-    res.header('Set-Cookie', `hanasand_auth_binding=${binding}; Max-Age=600; Path=/; SameSite=Lax; HttpOnly; Secure; Domain=.hanasand.com`)
+    res.header('Set-Cookie', `hanasand_auth_binding=${binding}; Max-Age=600; Path=/; SameSite=None; HttpOnly; Secure; Domain=.hanasand.com`)
     return true
 }
 
