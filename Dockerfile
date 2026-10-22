@@ -19,7 +19,7 @@ COPY package.json bun.lock bunfig.toml ./
 RUN chmod +x /usr/src/app/entrypoint.sh
 
 # Installs required dependencies
-RUN bun install
+RUN bun install --frozen-lockfile
 RUN bun run build:auth-client
 
 # Expose API port

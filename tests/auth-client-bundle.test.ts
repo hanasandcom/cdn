@@ -21,6 +21,10 @@ describe('shared Hanasand auth client bundle', () => {
             expect(script).toContain('hanasand-login-form')
             expect(script).toContain('hanasand-authenticated')
             expect(script).toContain('passkeyOptionsUrl')
+            expect(script).toContain('Content-Type')
+            expect(script).toContain('application/json')
+            expect(script).toContain('body: JSON.stringify({ username, password })')
+            expect(script).not.toContain('https://hanasand.com/api/auth/sso/start')
             expect(stylesheet).toContain('.hanasand-login-form__provider')
         } finally {
             await rm(outdir, { recursive: true, force: true })

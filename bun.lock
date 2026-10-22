@@ -15,7 +15,7 @@
         "eslint": "^10.2.0",
         "exifreader": "^4.50.0",
         "fastify": "^5.8.5",
-        "hanasand": "1.0.3",
+        "hanasand": "1.0.4",
         "pg": "^8.20.0",
         "sharp": "0.35.2",
         "typescript-eslint": "^8.58.2",
@@ -270,7 +270,7 @@
 
     "glob-parent": ["glob-parent@6.0.2", "", { "dependencies": { "is-glob": "^4.0.3" } }, "sha512-XxwI8EOhVQgWp6iDL+3b0r86f4d6AX6zSU55HfB4ydCEuXLXc5FcYeOu+nnGftS4TEju/11rt4KJPTMgbfmv4A=="],
 
-    "hanasand": ["hanasand@1.0.3", "", { "dependencies": { "fflate": "^0.8.3" }, "peerDependencies": { "@types/react": ">=19 <20", "@types/react-dom": ">=19 <20", "lucide-react": ">=1", "react": ">=19 <20", "react-dom": ">=19 <20" }, "optionalPeers": ["@types/react-dom", "lucide-react", "react-dom"] }, "sha512-W/zeinFCwjJZ3Atrzx7ksBZJ3OP4VKupgNj0JJ/bwYf0+kOoC+hGBTNUoHYhB9gDDxia5hk/3Z3R8umlZhzqxg=="],
+    "hanasand": ["hanasand@1.0.4", "", { "dependencies": { "fflate": "^0.8.3" }, "peerDependencies": { "@types/react": ">=19 <20", "@types/react-dom": ">=19 <20", "lucide-react": ">=1", "react": ">=19 <20", "react-dom": ">=19 <20" }, "optionalPeers": ["@types/react-dom", "lucide-react", "react-dom"] }, "sha512-nrXOXLSVAoU97QRODI69vQsJTHLopWr8dCwHUvLj4W98CBKNcc3WqU0Tyxa5XMk67okXT+M13j9/UKlLLa10vw=="],
 
     "ignore": ["ignore@5.3.2", "", {}, "sha512-hsBTNUqQTDwkWtcdYI2i06Y/nUBEsNEDJKjWdigLvegy8kDuJAS8uRlpkkcQpyEXL0Z/pjDy5HBmMjRCJ2gq+g=="],
 

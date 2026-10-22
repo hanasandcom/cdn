@@ -1,5 +1,6 @@
 import type { FastifyReply, FastifyRequest } from 'fastify'
 import { readFile } from 'node:fs/promises'
+import { renderHanasandLoginFormMarkup } from 'hanasand/auth'
 import { getSessionDetails, setSessionCookies } from '#utils/auth/session.ts'
 import { safeCdnReturnPath } from '#utils/auth/safeCdnReturnPath.ts'
 
@@ -35,7 +36,7 @@ const styles = `
 [hidden] { display: none !important; }
 body { margin: 0; min-height: 100vh; padding: 2rem 1rem; display: grid; place-items: center; }
 main { width: min(100%, 58rem); padding: 2rem; border: 1px solid #393939; border-radius: 1rem; background: #101010; }
-main.login-page { width: min(100%, 28rem); max-width: 28rem; padding: 1.5rem; border-radius: 1rem; box-shadow: 0 1.5rem 3rem #0003; }
+main.login-page { width: min(100%, 42rem); max-width: 42rem; padding: 2rem; border-radius: 1rem; box-shadow: 0 1.5rem 3rem #0003; }
 body.gallery-body { display: block; padding: 0; background: #1c1c1e; }
 main.gallery-page {
     width: 100%; max-width: none; min-height: 100vh; padding: 0; border: 0;
@@ -619,15 +620,14 @@ export async function getLoginPage(req: FastifyRequest, res: FastifyReply) {
     const query = req.query as { returnTo?: unknown } | undefined
     const redirectPath = safeCdnReturnPath(query?.returnTo)
     const ssoHref = `/api/auth/sso/start?redirectPath=${encodeURIComponent(redirectPath)}`
-    const body = `<hanasand-login-form login-url="/api/auth/login"
-passkey-options-url="/api/auth/passkeys/authenticate/options"
-passkey-verify-url="/api/auth/passkeys/authenticate/verify"
-sso-href="${escapeHtmlAttribute(ssoHref)}" redirect-path="${escapeHtmlAttribute(redirectPath)}"></hanasand-login-form>`
+    const body = renderHanasandLoginFormMarkup({
+        loginUrl: '/api/auth/login',
+        passkeyOptionsUrl: '/api/auth/passkeys/authenticate/options',
+        passkeyVerifyUrl: '/api/auth/passkeys/authenticate/verify',
+        ssoHref,
+        redirectPath,
+    })
     return res.header('Cache-Control', 'private, no-store').type('text/html').send(shell('Sign in', body, { mainClass: 'login-page' }))
-}
-
-function escapeHtmlAttribute(value: string) {
-    return value.replaceAll('&', '&amp;').replaceAll('"', '&quot;').replaceAll('<', '&lt;').replaceAll('>', '&gt;')
 }
 
 export async function getGalleryPage(_req: FastifyRequest, res: FastifyReply) {
