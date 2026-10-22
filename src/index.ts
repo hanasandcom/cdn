@@ -16,6 +16,13 @@ import {
 } from './handlers/index/staticPages.ts'
 import login from './handlers/auth/login.ts'
 import loginForm from './handlers/auth/loginForm.ts'
+import {
+    getPasskeyOptions,
+    getSocialProviders,
+    postPasskeyVerify,
+    postSocialStart,
+    postSsoStart,
+} from './handlers/auth/identityFlow.ts'
 import getSession from './handlers/auth/session.ts'
 import logout from './handlers/auth/logout.ts'
 import redirectLegacyFile from './handlers/files/redirectLegacy.ts'
@@ -84,6 +91,11 @@ fastify.get('/shared/:token', getSharedAlbumPage)
 fastify.get('/login', getLoginPage)
 fastify.post('/api/auth/login', login)
 fastify.get('/api/auth/login-form.js', loginForm)
+fastify.get('/api/auth/passkeys/authenticate/options', getPasskeyOptions)
+fastify.post('/api/auth/passkeys/authenticate/verify', postPasskeyVerify)
+fastify.get('/api/auth/social/providers', getSocialProviders)
+fastify.post('/api/auth/social/:provider/start', postSocialStart)
+fastify.post('/api/auth/sso/start', postSsoStart)
 fastify.get('/api/auth/session', getSession)
 fastify.get('/logout', logout)
 fastify.get('/files/:id', redirectLegacyFile)
