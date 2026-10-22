@@ -13,7 +13,7 @@ export default async function deleteFile(req: FastifyRequest, res: FastifyReply)
         return res.status(400).send({ error: 'Missing image ID' })
     }
 
-    const { status, id: userId } = await tokenWrapper(user, token)
+    const { status, id: userId } = await tokenWrapper(user, token, req)
     if (!status || !userId) {
         return res.status(401).send({ error: 'Unauthorized' })
     }

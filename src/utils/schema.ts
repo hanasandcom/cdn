@@ -56,6 +56,44 @@ export default async function ensureSchema() {
             ALTER TABLE files ADD COLUMN IF NOT EXISTS owner TEXT;
             ALTER TABLE files ADD COLUMN IF NOT EXISTS storage_key TEXT;
             ALTER TABLE files ADD COLUMN IF NOT EXISTS storage_size BIGINT;
+            ALTER TABLE files ADD COLUMN IF NOT EXISTS photo_taken_at TIMESTAMPTZ;
+            ALTER TABLE files ADD COLUMN IF NOT EXISTS location_label TEXT;
+            ALTER TABLE files ADD COLUMN IF NOT EXISTS latitude DOUBLE PRECISION;
+            ALTER TABLE files ADD COLUMN IF NOT EXISTS longitude DOUBLE PRECISION;
+
+            CREATE TABLE IF NOT EXISTS photo_albums (
+                id TEXT PRIMARY KEY,
+                owner TEXT NOT NULL,
+                name TEXT NOT NULL CHECK (length(name) BETWEEN 1 AND 120),
+                public_token TEXT UNIQUE,
+                created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+            );
+
+            CREATE TABLE IF NOT EXISTS photo_album_members (
+                album_id TEXT NOT NULL REFERENCES photo_albums(id) ON DELETE CASCADE,
+                user_id TEXT NOT NULL,
+                role TEXT NOT NULL DEFAULT 'viewer' CHECK (role IN ('viewer', 'contributor')),
+                added_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                PRIMARY KEY (album_id, user_id)
+            );
+
+            CREATE TABLE IF NOT EXISTS photo_album_items (
+                album_id TEXT NOT NULL REFERENCES photo_albums(id) ON DELETE CASCADE,
+                file_id TEXT NOT NULL REFERENCES files(id) ON DELETE CASCADE,
+                added_by TEXT NOT NULL,
+                added_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                PRIMARY KEY (album_id, file_id)
+            );
+
+            CREATE INDEX IF NOT EXISTS idx_photo_albums_owner_updated
+            ON photo_albums(owner, updated_at DESC);
+            CREATE INDEX IF NOT EXISTS idx_photo_album_members_user
+            ON photo_album_members(user_id, album_id);
+            CREATE INDEX IF NOT EXISTS idx_photo_album_items_album_added
+            ON photo_album_items(album_id, added_at DESC);
+            CREATE INDEX IF NOT EXISTS idx_files_owner_taken
+            ON files(owner, photo_taken_at DESC);
 
             CREATE INDEX IF NOT EXISTS idx_files_owner_uploaded_at
             ON files(owner, uploaded_at DESC);

@@ -23,7 +23,7 @@ export default async function getShare(req: FastifyRequest, res: FastifyReply) {
             }
 
             const token = tokenHeader.split(' ')[1] ?? ''
-            const { status, id: userId } = await tokenWrapper(user, token)
+            const { status, id: userId } = await tokenWrapper(user, token, req)
             let owner = null
             if (status && userId) {
                 owner = userId

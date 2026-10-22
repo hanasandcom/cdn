@@ -3,7 +3,17 @@ import { readFile } from 'node:fs/promises'
 import { getSessionDetails, setSessionCookies } from '#utils/auth/session.ts'
 
 const uploadPickerPath = new URL('../../client/upload-picker.js', import.meta.url)
+const galleryClientPath = new URL('../../client/gallery.js', import.meta.url)
 const exifReaderPath = new URL('../../../node_modules/exifreader/dist/exif-reader.js', import.meta.url)
+const deviceProofWorkerPath = new URL('../../client/device-proof-sw.js', import.meta.url)
+
+export async function getDeviceProofServiceWorker(_req: FastifyRequest, res: FastifyReply) {
+    return res
+        .header('Cache-Control', 'no-cache')
+        .header('Service-Worker-Allowed', '/')
+        .type('text/javascript')
+        .send(await readFile(deviceProofWorkerPath))
+}
 
 export async function getUploadPickerScript(_req: FastifyRequest, res: FastifyReply) {
     const script = await readFile(uploadPickerPath)
@@ -14,6 +24,10 @@ export async function getExifReaderScript(_req: FastifyRequest, res: FastifyRepl
     return res.header('Cache-Control', 'no-store').type('text/javascript').send(await readFile(exifReaderPath))
 }
 
+export async function getGalleryClientScript(_req: FastifyRequest, res: FastifyReply) {
+    return res.header('Cache-Control', 'no-store').type('text/javascript').send(await readFile(galleryClientPath))
+}
+
 const styles = `
 :root { color-scheme: dark; font: 16px system-ui, sans-serif; background: #050505; color: #f6f6f3; }
 * { box-sizing: border-box; }
@@ -22,6 +36,7 @@ body { margin: 0; min-height: 100vh; padding: 2rem 1rem; display: grid; place-it
 main { width: min(100%, 58rem); padding: 2rem; border: 1px solid #393939; border-radius: 1rem; background: #101010; }
 main.login-page { width: min(100%, 18rem); max-width: 18rem; padding: 1.25rem; }
 main.gallery-page { width: min(100%, 96rem); }
+main.gallery-page > h1 { display: none; }
 a { color: inherit; }
 header { display: flex; justify-content: space-between; align-items: center; gap: 1rem; }
 main.login-page header { flex-wrap: wrap; }
@@ -135,16 +150,89 @@ hanasand-upload-picker:defined > .picker-fallback { display: none; }
 .viewer-info h2 { margin: .25rem 0 1rem; overflow-wrap: anywhere; font-size: 1rem; }
 .viewer-info p { overflow-wrap: anywhere; }
 .viewer-download { display: inline-flex; margin-top: 1rem; }
+.photo-library-layout { display: grid; grid-template-columns: 14rem minmax(0, 1fr); gap: 1.5rem; min-height: 70vh; margin-top: 1.5rem; }
+.public-library { grid-template-columns: minmax(0, 1fr); }
+.library-sidebar { display: grid; align-content: start; gap: 1.25rem; padding-right: 1rem; border-right: 1px solid #303030; }
+.library-section { display: grid; gap: .35rem; }
+.library-section h2 { margin: 0 0 .25rem; color: #999; font-size: .72rem; letter-spacing: .08em; text-transform: uppercase; }
+.library-nav, .album-nav {
+    display: flex; width: 100%; align-items: center; gap: .6rem; border: 0;
+    background: transparent; color: #d8d8d8; padding: .6rem .7rem;
+    text-align: left; font-size: .9rem;
+}
+.library-nav:hover, .library-nav[aria-current="page"], .album-nav:hover,
+.album-nav[aria-current="page"] { border-radius: .6rem; background: #303030; color: #fff; }
+.library-nav .count, .album-nav .count { margin-left: auto; color: #999; font-size: .75rem; }
+.new-album {
+    width: 100%; margin-top: .3rem; border: 1px solid #3a3a3a;
+    background: #202020; color: #eee; padding: .55rem; font-size: .8rem;
+}
+.library-content { min-width: 0; }
+.library-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 1rem; margin-bottom: 1rem; }
+.library-toolbar h2 { margin: 0; font-size: 1.2rem; }
+.library-actions { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem; }
+.library-actions button, .library-actions select, .album-dialog button {
+    min-height: 2.4rem; border: 1px solid #3b3b3b; border-radius: .55rem;
+    background: #202020; color: #eee; padding: .5rem .7rem; font-size: .82rem;
+}
+.library-actions button:disabled { opacity: .5; }
+.photo-group { margin: 1.5rem 0 2rem; }
+.photo-group-heading { display: flex; align-items: baseline; gap: .75rem; margin: 0 0 .75rem; }
+.photo-group-heading h3 { margin: 0; font-size: 1rem; }
+.photo-group-heading span { color: #999; font-size: .85rem; }
+.photo-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(8rem, 1fr)); gap: .4rem; align-content: start; }
+.library-grid { display: grid; align-content: start; }
+.library-grid[aria-busy="true"] { min-height: 18rem; place-items: center; }
+.library-grid > .loading-indicator { grid-column: 1 / -1; }
+.photo-card { position: relative; min-width: 0; aspect-ratio: 1; overflow: hidden; border-radius: .25rem; background: #171717; }
+.photo-card > button { display: block; width: 100%; height: 100%; padding: 0; border: 0; background: transparent; }
+.photo-card .preview { width: 100%; height: 100%; aspect-ratio: auto; object-fit: cover; transition: transform .18s ease; }
+.photo-card > button:hover .preview { transform: scale(1.035); }
+.photo-select { position: absolute; top: .45rem; left: .45rem; width: 1.2rem; height: 1.2rem; accent-color: #5e9cff; opacity: 0; }
+.photo-card:hover .photo-select, .photo-select:focus-visible, .photo-select:checked { opacity: 1; }
+.photo-select:checked { width: 1.25rem; height: 1.25rem; }
+.album-remove {
+    position: absolute; top: .35rem; right: .35rem; display: grid;
+    width: 1.8rem; height: 1.8rem; place-items: center; border: 1px solid #555;
+    border-radius: 50%; background: #111d; color: #fff; padding: 0;
+}
+.album-dialog {
+    width: min(92vw, 30rem); border: 1px solid #3c3c3c;
+    border-radius: .9rem; background: #151515; color: #eee; padding: 1.25rem;
+}
+.album-dialog::backdrop { background: #000b; backdrop-filter: blur(5px); }
+.album-dialog form { display: grid; gap: .85rem; }
+.album-dialog h2 { margin: 0; font-size: 1.15rem; }
+.album-dialog label { display: grid; gap: .35rem; color: #bbb; font-size: .85rem; }
+.album-dialog input, .album-dialog select {
+    width: 100%; border: 1px solid #444; background: #080808; color: #fff;
+}
+.album-dialog .dialog-actions { display: flex; justify-content: flex-end; gap: .5rem; margin-top: .25rem; }
+.album-dialog .primary { background: #f6f6f3; color: #111; }
+.album-dialog .danger { color: #ff8e8e; }
+.album-share-link { overflow-wrap: anywhere; }
 @media (max-width: 48rem) {
     main.login-page { padding: 1rem; }
     main.login-page header { align-items: flex-start; flex-direction: column; gap: .5rem; }
     main.login-page header nav { align-self: flex-end; }
     main.gallery-page { padding: 1rem; }
+    .photo-library-layout { grid-template-columns: minmax(0, 1fr); gap: 1rem; }
+    .library-sidebar {
+        grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .75rem;
+        padding-right: 0; padding-bottom: .75rem; border-right: 0;
+        border-bottom: 1px solid #303030;
+    }
+    .library-section { min-width: 0; }
+    .library-section:first-child { grid-column: 1 / -1; }
+    .library-nav, .album-nav { padding: .5rem; }
+    .library-toolbar { align-items: flex-start; flex-direction: column; }
+    .photo-grid { grid-template-columns: repeat(auto-fill, minmax(6rem, 1fr)); }
     .photo-viewer { width: 100vw; height: 100dvh; border: 0; border-radius: 0; }
     .viewer-layout { grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1fr) auto; }
     .viewer-info { max-height: 30dvh; border-top: 1px solid #393939; border-left: 0; padding: .75rem 1rem; }
     .viewer-info h2 { margin-bottom: .5rem; }
 }
+@media (hover: none) { .photo-select { opacity: 1; } }
 @media (min-width: 48rem) {
     .picker-fallback { grid-template-columns: minmax(0, 1.05fr) minmax(0, .95fr); }
     .picker-fallback-drop-side { min-height: 26.25rem; border-right: 1px solid #393939; border-bottom: 0; padding: 1.5rem; }
@@ -160,6 +248,7 @@ function shell(title: string, body: string, options: { mainClass?: string, showB
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width">
 <title>${title} · Hanasand CDN</title>
+<script src="https://api.hanasand.com/api/auth/device-proof-client.js"></script>
 <style>${styles}</style>
 <main class="${options.mainClass || ''}">
 <header>${brand}
@@ -170,23 +259,25 @@ ${body}
 </html>`
 }
 
-const authScript = `<script>
-const login = () => location.replace('/login?returnTo=' + encodeURIComponent(location.pathname))
-const fileUrl = id => '/api/files/' + encodeURIComponent(id)
-window.cdnAuth = (async () => {
-    const response = await fetch('/api/auth/session', { cache: 'no-store', credentials: 'same-origin' })
-    if (response.status === 401) { login(); return null }
-    if (!response.ok) throw Error('Your session could not be checked. Reload to try again.')
-    return response.json()
-})()
-</script>`
-
-function uploadAuthScript(userId: string | null) {
-    const auth = userId ? JSON.stringify({ id: userId }) : 'null'
+function uploadAuthScript() {
     return `<script>
 const login = () => location.replace('/login?returnTo=' + encodeURIComponent(location.pathname))
 const fileUrl = id => '/api/files/' + encodeURIComponent(id)
-window.cdnAuth = Promise.resolve(${auth})
+window.cdnAuth = fetch('/api/auth/session', { cache: 'no-store', credentials: 'same-origin' }).then(response => {
+    if (response.status === 401) return null
+    if (!response.ok) throw Error('Your session could not be checked.')
+    return response.json()
+}).then(auth => {
+    if (auth) document.querySelector('#upload-hint')?.remove()
+    else if (!document.querySelector('#upload-hint')) {
+        const hint = document.createElement('p')
+        hint.id = 'upload-hint'
+        hint.className = 'upload-hint'
+        hint.textContent = 'Sign in to upload multiple files at once.'
+        document.querySelector('.upload-actions')?.prepend(hint)
+    }
+    return auth
+})
 </script>`
 }
 
@@ -218,7 +309,7 @@ ${guestHint}
 <p id="status" class="upload-status" role="status" aria-live="polite"></p>
 <script defer src="/assets/exifreader.js"></script>
 <script defer src="/assets/upload-picker.js"></script>
-${uploadAuthScript(userId)}
+${uploadAuthScript()}
 <script>
 const form = document.querySelector('#upload')
 const picker = document.querySelector('#picker')
@@ -437,140 +528,69 @@ form.addEventListener('submit', async event => {
 }
 
 export async function getGalleryPage(_req: FastifyRequest, res: FastifyReply) {
-    const body = `<section id="files" aria-live="polite" aria-busy="true" class="gallery">
-<span class="loading-indicator" role="status" aria-label="Loading files"></span></section>
+    const body = `<div id="photo-library" class="photo-library-layout" aria-busy="true">
+<aside class="library-sidebar" aria-label="Photo library">
+<div class="library-section"><h2>Library</h2>
+<button class="library-nav" data-view="library" aria-current="page"><span>▦</span> All photos</button>
+<button class="library-nav" data-view="recent"><span>◷</span> Recent</button></div>
+<div class="library-section"><h2>Albums</h2><div id="owned-albums"></div>
+<button id="create-album" class="new-album" type="button">＋ New album</button></div>
+<div class="library-section"><h2>Shared with me</h2><div id="shared-albums"></div></div>
+</aside>
+<section class="library-content" aria-label="Photos">
+<div class="library-toolbar"><h2 id="view-title">Library</h2><div class="library-actions">
+<span id="selection-count" class="muted" hidden></span>
+<select id="album-target" aria-label="Choose an album"><option value="">Add to album</option></select>
+<button id="add-to-album" type="button" disabled>Add selected</button>
+<button id="manage-album" type="button" hidden>Share</button>
 <button id="load-more" type="button" hidden>Load more</button>
-<dialog id="photo-viewer" class="photo-viewer" aria-label="Photo viewer">
-<div class="viewer-layout">
-<div class="viewer-stage">
-<div class="viewer-toolbar"><span id="viewer-count" class="muted"></span>
+</div></div>
+<div id="files" class="library-grid" aria-live="polite" aria-busy="true">
+<span class="loading-indicator" role="status" aria-label="Loading photos"></span></div>
+</section></div>
+<dialog id="photo-viewer" class="photo-viewer" aria-label="Photo viewer"><div class="viewer-layout">
+<div class="viewer-stage"><div class="viewer-toolbar"><span id="viewer-count" class="muted"></span>
 <button id="viewer-close" type="button" aria-label="Close photo">×</button></div>
-<div class="viewer-image-wrap"><img id="viewer-image" class="viewer-image" alt=""></div>
+<div class="viewer-image-wrap"><img id="viewer-image" class="viewer-image" alt="">
+<video id="viewer-video" class="viewer-image" controls playsinline hidden></video></div>
 <div class="viewer-nav"><button id="viewer-prev" type="button" aria-label="Previous photo">‹</button>
-<button id="viewer-next" type="button" aria-label="Next photo">›</button></div>
-</div>
-<aside id="viewer-info" class="viewer-info"></aside>
-</div>
-</dialog>
-${authScript}
+<button id="viewer-next" type="button" aria-label="Next photo">›</button></div></div>
+<aside id="viewer-info" class="viewer-info"></aside></div></dialog>
+<dialog id="album-form" class="album-dialog"></dialog>
 <script>
-const root = document.querySelector('#files')
-const loadMore = document.querySelector('#load-more')
-const viewer = document.querySelector('#photo-viewer')
-const viewerImage = document.querySelector('#viewer-image')
-const viewerInfo = document.querySelector('#viewer-info')
-const viewerCount = document.querySelector('#viewer-count')
-const viewerFiles = []
-let offset = 0
-let previewCount = 0
-let activePhotoIndex = 0
-const showMessage = message => {
-    root.setAttribute('aria-busy', 'false')
-    root.replaceChildren()
-    root.textContent = message
-}
-const openPhoto = index => {
-    activePhotoIndex = index
-    const file = viewerFiles[index]
-    const url = fileUrl(file.id)
-    viewerImage.src = url
-    viewerImage.alt = file.name
-    viewerCount.textContent = (index + 1) + ' of ' + viewerFiles.length
-    const heading = document.createElement('h2')
-    const type = document.createElement('p')
-    const uploaded = document.createElement('p')
-    const download = document.createElement('a')
-    heading.textContent = file.name
-    type.textContent = file.type
-    uploaded.textContent = 'Uploaded ' + new Date(file.uploaded_at).toLocaleString()
-    download.className = 'viewer-download'
-    download.href = url
-    download.download = file.name
-    download.textContent = 'Download original'
-    viewerInfo.replaceChildren(heading, type, uploaded, download)
-    if (!viewer.open) viewer.showModal()
-}
-const movePhoto = step => openPhoto((activePhotoIndex + step + viewerFiles.length) % viewerFiles.length)
-document.querySelector('#viewer-close').addEventListener('click', () => viewer.close())
-document.querySelector('#viewer-prev').addEventListener('click', () => movePhoto(-1))
-document.querySelector('#viewer-next').addEventListener('click', () => movePhoto(1))
-viewer.addEventListener('click', event => { if (event.target === viewer) viewer.close() })
-viewer.addEventListener('keydown', event => {
-    if (event.key === 'ArrowLeft') movePhoto(-1)
-    if (event.key === 'ArrowRight') movePhoto(1)
+window.cdnAuth = fetch('/api/auth/session', { cache: 'no-store', credentials: 'same-origin' }).then(response => {
+    if (response.status === 401) return null
+    if (!response.ok) throw Error('Your photo library could not be loaded.')
+    return response.json()
 })
-const appendFiles = files => {
-    if (!offset) root.replaceChildren()
-    for (const file of files) {
-        const details = document.createElement('details')
-        const summary = document.createElement('summary')
-        const info = document.createElement('div')
-        const name = document.createElement('p')
-        const meta = document.createElement('p')
-        const link = document.createElement('a')
-        details.className = 'file'
-        const url = fileUrl(file.id)
-        const isImage = /^image[/](jpeg|png|gif|webp|avif)$/i.test(file.type)
-        if (isImage) {
-            const photoIndex = viewerFiles.push(file) - 1
-            const preview = document.createElement('img')
-            preview.className = 'preview'
-            preview.src = url
-            preview.alt = file.name
-            preview.decoding = 'async'
-            preview.loading = previewCount === 0 ? 'eager' : 'lazy'
-            previewCount++
-            summary.append(preview)
-            summary.setAttribute('aria-label', 'View ' + file.name)
-            summary.addEventListener('click', event => { event.preventDefault(); openPhoto(photoIndex) })
-        } else {
-            const placeholder = document.createElement('span')
-            placeholder.className = 'file-placeholder'
-            placeholder.setAttribute('aria-hidden', 'true')
-            placeholder.textContent = '▤'
-            summary.append(placeholder)
-        }
-        name.textContent = file.name
-        meta.className = 'muted'
-        meta.textContent = file.type + ' · ' + new Date(file.uploaded_at).toLocaleString()
-        link.href = url
-        link.textContent = 'Open original'
-        link.setAttribute('aria-label', 'Open ' + file.name)
-        info.className = 'file-info'
-        info.append(name, meta, link)
-        details.append(summary, info)
-        root.append(details)
-    }
-    offset += files.length
-    root.setAttribute('aria-busy', 'false')
-    loadMore.hidden = files.length < 100
-}
-const fetchFiles = async auth => {
-    loadMore.disabled = true
-    try {
-        const response = await fetch(
-            '/api/files/user/' + encodeURIComponent(auth.id) + '?limit=100&offset=' + offset,
-            { cache: 'no-store', credentials: 'same-origin' },
-        )
-        if (response.status === 401) return login()
-        if (!response.ok) throw Error('Your library could not be loaded.')
-        const files = await response.json()
-        if (!offset && !files.length) showMessage('No files yet.')
-        else appendFiles(files)
-    } catch (error) {
-        if (!offset) showMessage(error.message || 'Your library could not be loaded.')
-        else throw error
-    } finally {
-        loadMore.disabled = false
-    }
-}
-loadMore.addEventListener('click', () => window.cdnAuth
-    .then(auth => auth && fetchFiles(auth))
-    .catch(error => { loadMore.textContent = error.message || 'Could not load more files.' }))
-window.cdnAuth.then(auth => auth && fetchFiles(auth))
-    .catch(error => showMessage(error.message || 'Your library could not be loaded.'))
-</script>`
+</script>
+<script src="/assets/gallery.js" defer></script>`
     return res.header('Cache-Control', 'private, no-store').type('text/html').send(
-        shell('Your files', body, { mainClass: 'gallery-page', showBrand: false }),
+        shell('Library', body, { mainClass: 'gallery-page', showBrand: false }),
+    )
+}
+
+export async function getSharedAlbumPage(req: FastifyRequest, res: FastifyReply) {
+    const { token } = req.params as { token: string }
+    const body = `<div id="photo-library" class="photo-library-layout public-library"
+    data-public-token="${encodeURIComponent(token)}" aria-busy="true">
+<section class="library-content" aria-label="Shared album">
+<div class="library-toolbar"><h2 id="view-title">Shared album</h2></div>
+<div id="files" class="library-grid" aria-live="polite" aria-busy="true">
+<span class="loading-indicator" role="status" aria-label="Loading photos"></span></div>
+<button id="load-more" type="button" hidden>Load more</button>
+</section></div>
+<dialog id="photo-viewer" class="photo-viewer" aria-label="Photo viewer"><div class="viewer-layout">
+<div class="viewer-stage"><div class="viewer-toolbar"><span id="viewer-count" class="muted"></span>
+<button id="viewer-close" type="button" aria-label="Close photo">×</button></div>
+<div class="viewer-image-wrap"><img id="viewer-image" class="viewer-image" alt="">
+<video id="viewer-video" class="viewer-image" controls playsinline hidden></video></div>
+<div class="viewer-nav"><button id="viewer-prev" type="button" aria-label="Previous photo">‹</button>
+<button id="viewer-next" type="button" aria-label="Next photo">›</button></div></div>
+<aside id="viewer-info" class="viewer-info"></aside></div></dialog>
+<dialog id="album-form" class="album-dialog"></dialog>
+<script src="/assets/gallery.js" defer></script>`
+    return res.header('Cache-Control', 'no-store').type('text/html').send(
+        shell('Shared album', body, { mainClass: 'gallery-page', showBrand: false }),
     )
 }

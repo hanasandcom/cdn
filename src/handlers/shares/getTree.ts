@@ -22,7 +22,7 @@ export default async function getTree(req: FastifyRequest, res: FastifyReply) {
             }
 
             const token = tokenHeader.split(' ')[1] ?? ''
-            const { status, id: userId } = await tokenWrapper(user, token)
+            const { status, id: userId } = await tokenWrapper(user, token, req)
 
             if (status && userId) {
                 owner = userId

@@ -6,10 +6,13 @@ import { prepareStorage } from '#utils/fileStorage.ts'
 import getIndex from './handlers/index/get.ts'
 import {
     getExifReaderScript,
+    getDeviceProofServiceWorker,
     getGalleryPage,
+    getGalleryClientScript,
     getLoginPage,
     getUploadPage,
     getUploadPickerScript,
+    getSharedAlbumPage,
 } from './handlers/index/staticPages.ts'
 import login from './handlers/auth/login.ts'
 import getSession from './handlers/auth/session.ts'
@@ -72,7 +75,10 @@ fastify.get('/', getIndex)
 fastify.get('/upload', getUploadPage)
 fastify.get('/assets/exifreader.js', getExifReaderScript)
 fastify.get('/assets/upload-picker.js', getUploadPickerScript)
+fastify.get('/assets/gallery.js', getGalleryClientScript)
+fastify.get('/device-proof-sw.js', getDeviceProofServiceWorker)
 fastify.get('/gallery', getGalleryPage)
+fastify.get('/shared/:token', getSharedAlbumPage)
 fastify.get('/login', getLoginPage)
 fastify.post('/api/auth/login', login)
 fastify.get('/api/auth/session', getSession)

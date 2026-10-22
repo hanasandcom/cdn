@@ -8,6 +8,8 @@ backend default {
 sub vcl_recv {
     if (req.url ~ "^/health") { return (pass); }
     if (req.url ~ "^/(gallery|upload|login)(?:[/?#]|$)") { return (pass); }
+    if (req.url ~ "^/shared/[^/?#]+(?:[?#].*)?$") { return (pass); }
+    if (req.url ~ "^/api/(albums|files)(?:[/?#].*)?$") { return (pass); }
     if (req.url ~ "^/files/[^/?#]+(?:[?#]|$)") { return (pass); }
     if (req.http.Upgrade ~ "(?i)websocket") {
         return (pipe);

@@ -29,7 +29,7 @@ export default async function getUserFiles(
     }
 
     const authenticatedId = headerUserId && token
-        ? (await tokenWrapper(headerUserId, token)).id
+        ? (await tokenWrapper(headerUserId, token, req)).id
         : await getSessionUserId(req)
     if (authenticatedId !== id) {
         return res.status(401).send({ error: 'Unauthorized' })
@@ -41,7 +41,9 @@ export default async function getUserFiles(
 
     try {
         const result = await run(
-            `SELECT id, name, description, type, path, owner, uploaded_at, COALESCE(storage_size,octet_length(data)) AS size_bytes
+            `SELECT id, name, description, type, path, owner, uploaded_at,
+                    photo_taken_at, location_label, latitude, longitude,
+                    COALESCE(storage_size,octet_length(data)) AS size_bytes
              FROM files
              WHERE owner = $1
              ORDER BY uploaded_at DESC, id DESC

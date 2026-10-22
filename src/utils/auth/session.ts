@@ -22,7 +22,7 @@ export async function getSessionDetails(req: FastifyRequest) {
     const id = cookies.get('id') || ''
     const token = cookies.get('access_token') || ''
     if (!id || !token) return null
-    const auth = await tokenWrapper(id, token)
+    const auth = await tokenWrapper(id, token, req)
     if (!auth.status || !auth.id || !auth.expires_at) return null
     const expiresAt = Date.parse(auth.expires_at)
     if (!Number.isFinite(expiresAt)) return null

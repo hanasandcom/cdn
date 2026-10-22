@@ -13,7 +13,7 @@ export default async function addShareEditors(req: FastifyRequest, res: FastifyR
     const user: string = req.headers['id'] as string || ''
     const tokenHeader = req.headers['authorization'] || ''
     const token = tokenHeader.split(' ')[1] ?? ''
-    const { status, id: userId } = await tokenWrapper(user, token)
+    const { status, id: userId } = await tokenWrapper(user, token, req)
     if (!status || !userId) {
         return res.status(401).send({ error: 'Unauthorized' })
     }

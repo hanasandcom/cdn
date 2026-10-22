@@ -5,8 +5,10 @@ export const MISS_WINDOW_MS = 60_000
 export const CLEANUP_INTERVAL_MS = 5 * 60_000
 
 export const TARGET_ROUTE_GROUPS = [
+    '/api/albums/public/',
     '/api/share/',
     '/api/files/path/',
+    '/api/files/',
     '/api/files/check',
 ]
 

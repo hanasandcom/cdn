@@ -51,6 +51,10 @@ import listGroupsByEditor from './handlers/project/groups/listGroupsByEditor.ts'
 import createProjectGroup from './handlers/project/groups/post.ts'
 import getProjects from './handlers/project/getProjects.ts'
 import getInstall from './handlers/index/install.ts'
+import {
+    addAlbumItems, addAlbumMember, createAlbum, deleteAlbum, getAlbum, getPublicAlbum,
+    listAlbums, removeAlbumItem, removeAlbumMember, updateAlbum,
+} from './handlers/albums.ts'
 
 export default async function apiRoutes(fastify: FastifyInstance) {
     // index
@@ -68,6 +72,18 @@ export default async function apiRoutes(fastify: FastifyInstance) {
     fastify.post('/files', postFile)
     fastify.post('/files/bulk', postBulkFiles)
     fastify.delete('/files/:id', deleteFile)
+
+    // Photo library and album sharing
+    fastify.get('/albums/public/:token', getPublicAlbum)
+    fastify.get('/albums', listAlbums)
+    fastify.post('/albums', createAlbum)
+    fastify.get('/albums/:id', getAlbum)
+    fastify.patch('/albums/:id', updateAlbum)
+    fastify.delete('/albums/:id', deleteAlbum)
+    fastify.post('/albums/:id/items', addAlbumItems)
+    fastify.delete('/albums/:id/items/:fileId', removeAlbumItem)
+    fastify.post('/albums/:id/members', addAlbumMember)
+    fastify.delete('/albums/:id/members/:userId', removeAlbumMember)
 
     // share
     fastify.get('/share/:id', getShare)

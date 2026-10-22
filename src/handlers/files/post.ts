@@ -4,12 +4,13 @@ import tokenWrapper from '#utils/auth/tokenWrapper.ts'
 import { persistFile, maxFileBytes, StorageError } from '#utils/fileStorage.ts'
 import { beginGuestUpload, beginUpload } from '#utils/uploadGuard.ts'
 import { getSessionUserId } from '#utils/auth/session.ts'
+import { readPhotoMetadata } from '#utils/photoMetadata.ts'
 
 export default async function postFile(req: FastifyRequest, res: FastifyReply) {
     const user = typeof req.headers.id === 'string' ? req.headers.id : ''
     const token = req.headers.authorization?.split(' ')[1] || ''
     const userId = user && token
-        ? (await tokenWrapper(user, token)).id
+        ? (await tokenWrapper(user, token, req)).id
         : await getSessionUserId(req)
     if (!req.isMultipart()) return res.status(400).send({ error: 'Request is not multipart' })
     let finish: (() => void) | undefined
@@ -39,10 +40,13 @@ export default async function postFile(req: FastifyRequest, res: FastifyReply) {
         }
         const id = randomUUID()
         const path = userId ? fields.path || id : id
+        const metadata = readPhotoMetadata(data, type)
         await persistFile(owner, data, async (client, key) => {
-            await client.query(`INSERT INTO files (id,name,description,data,path,type,owner,storage_key,storage_size)
-                VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)`,
-            [id, fields.name, fields.description || null, Buffer.alloc(0), path, type, owner, key, data!.length])
+            await client.query(`INSERT INTO files
+                (id,name,description,data,path,type,owner,storage_key,storage_size,photo_taken_at,location_label,latitude,longitude)
+                VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)`,
+            [id, fields.name, fields.description || null, Buffer.alloc(0), path, type, owner, key, data!.length,
+                metadata.photoTakenAt, metadata.locationLabel, metadata.latitude, metadata.longitude])
         })
         return res.send({ id, path, owner: userId || null })
     } catch (error) {

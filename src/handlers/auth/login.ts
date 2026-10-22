@@ -26,6 +26,7 @@ export default async function login(req: FastifyRequest, res: FastifyReply) {
             headers: {
                 'Content-Type': 'application/json',
                 'x-request-id': req.id,
+                ...(typeof req.headers['x-device-public-jwk'] === 'string' ? { 'x-device-public-jwk': req.headers['x-device-public-jwk'] } : {}),
                 'user-agent': String(req.headers['user-agent'] || '').slice(0, 1000),
                 ...(isIP(req.ip) ? { 'x-forwarded-for': req.ip } : {}),
             },
