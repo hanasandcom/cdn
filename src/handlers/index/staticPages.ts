@@ -353,14 +353,14 @@ function shell(title: string, body: string, options: { mainClass?: string, showB
     const brand = options.showBrand === false ? '' : '<a href="/" aria-label="Hanasand CDN">Hanasand CDN</a>'
     const bodyClass = options.mainClass === 'gallery-page' ? 'gallery-body' : ''
     const loginScript = options.mainClass === 'login-page'
-        ? '<script src="https://identity.hanasand.com/api/auth/login-form.js" defer></script>'
+        ? '<script src="/api/auth/login-form.js" defer></script>'
         : ''
     return `<!doctype html>
 <html lang="en">
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width">
 <title>${title} · Hanasand CDN</title>
-<script src="https://api.hanasand.com/api/auth/device-proof-client.js"></script>
+<script src="/api/auth/device-proof-client.js"></script>
 <style>${styles}</style>
 ${loginScript}
 <body class="${bodyClass}">
