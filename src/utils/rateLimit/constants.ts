@@ -6,6 +6,10 @@ export const CLEANUP_INTERVAL_MS = 5 * 60_000
 
 export const TARGET_ROUTE_GROUPS = [
     '/api/auth/login-form.js',
+    '/api/auth/device-proof-client.js',
+    '/api/auth/device-proof',
+    '/api/auth/device-proof.js',
+    '/api/auth/device-proof/origins',
     '/api/auth/passkeys/authenticate/',
     '/api/auth/social/providers',
     '/api/auth/social/',

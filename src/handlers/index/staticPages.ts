@@ -360,7 +360,7 @@ function shell(title: string, body: string, options: { mainClass?: string, showB
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width">
 <title>${title} · Hanasand CDN</title>
-<script src="https://api.hanasand.com/api/auth/device-proof-client.js"></script>
+<script src="/api/auth/device-proof-client.js" defer></script>
 <style>${styles}</style>
 ${loginScript}
 <body class="${bodyClass}">

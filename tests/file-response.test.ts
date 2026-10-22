@@ -130,6 +130,10 @@ describe('shared login form proxy', () => {
     test('groups the shared login asset under public read limits', () => {
         expect(getTargetRouteGroup('/api/auth/login-form.js')).toBe('/api/auth/login-form.js')
         expect(getTargetRouteGroup('/api/auth/login-form.js/extra')).toBeNull()
+        expect(getTargetRouteGroup('/api/auth/device-proof-client.js')).toBe('/api/auth/device-proof-client.js')
+        expect(getTargetRouteGroup('/api/auth/device-proof')).toBe('/api/auth/device-proof')
+        expect(getTargetRouteGroup('/api/auth/device-proof.js')).toBe('/api/auth/device-proof.js')
+        expect(getTargetRouteGroup('/api/auth/device-proof/origins')).toBe('/api/auth/device-proof/origins')
     })
 
     test('proxies the fixed Identity login asset with safe headers', async () => {
@@ -181,6 +185,65 @@ describe('shared login form proxy', () => {
         await oversized({} as never, reply as never)
 
         expect(statusCodes).toEqual([502, 502])
+    })
+
+    test('proxies the fixed Identity device-proof asset through CDN origin', async () => {
+        const { createDeviceProofClientProxy } = await import('../src/handlers/auth/loginForm.ts')
+        let requested = ''
+        const headers: Record<string, string> = {}
+        let body = ''
+        const reply = {
+            header: (name: string, value: string) => { headers[name] = value; return reply },
+            type: () => reply,
+            send: (value: Buffer) => { body = value.toString(); return value },
+        }
+        const handler = createDeviceProofClientProxy('http://identity:8081/api', async input => {
+            requested = String(input)
+            return new Response('window.hanasandDeviceProof = true', {
+                status: 200,
+                headers: { 'content-type': 'application/javascript; charset=utf-8' },
+            })
+        })
+
+        await handler({} as never, reply as never)
+
+        expect(requested).toBe('http://identity:8081/api/auth/device-proof-client.js')
+        expect(body).toContain('hanasandDeviceProof')
+        expect(headers['Cache-Control']).toBe('no-store')
+    })
+
+    test('proxies only fixed broker routes and preserves their media types', async () => {
+        const { createDeviceProofBrokerProxy, createDeviceProofBrokerScriptProxy, createDeviceProofOriginsProxy } =
+            await import('../src/handlers/auth/loginForm.ts')
+        const paths: string[] = []
+        const contentTypes: string[] = []
+        const reply = {
+            header: () => reply,
+            type: (value: string) => { contentTypes.push(value); return reply },
+            send: (value: Buffer) => { expect(value.byteLength).toBeGreaterThan(0); return value },
+        }
+        const fetcher = async (input: string | URL | Request) => {
+            paths.push(String(input))
+            const path = new URL(String(input)).pathname
+            const type = path.endsWith('/device-proof') ? 'text/html'
+                : path.endsWith('/origins') ? 'application/json' : 'application/javascript'
+            return new Response(path.endsWith('/origins') ? '{"origins":["https://cdn.hanasand.com"]}' : '/* proof asset */', {
+                status: 200,
+                headers: { 'content-type': type },
+            })
+        }
+        await createDeviceProofBrokerProxy('http://identity:8081/api', fetcher as typeof fetch)({} as never, reply as never)
+        await createDeviceProofBrokerScriptProxy('http://identity:8081/api', fetcher as typeof fetch)({} as never, reply as never)
+        await createDeviceProofOriginsProxy('http://identity:8081/api', fetcher as typeof fetch)({} as never, reply as never)
+
+        expect(paths).toEqual([
+            'http://identity:8081/api/auth/device-proof',
+            'http://identity:8081/api/auth/device-proof.js',
+            'http://identity:8081/api/auth/device-proof/origins',
+        ])
+        expect(contentTypes).toEqual([
+            'text/html; charset=utf-8', 'application/javascript; charset=utf-8', 'application/json; charset=utf-8',
+        ])
     })
 })
 
@@ -268,6 +331,7 @@ describe('standalone CDN pages', () => {
         expect(login).toContain('main.login-page { width: min(100%, 28rem); max-width: 28rem;')
         expect(login).not.toContain('Sign in to your Hanasand account to upload files and view your library.')
         expect(login).toContain('<script src="/api/auth/login-form.js" defer></script>')
+        expect(login).toContain('<script src="/api/auth/device-proof-client.js" defer></script>')
         expect(login).not.toContain('<script src="https://identity.hanasand.com/api/auth/login-form.js" defer></script>')
         expect(login).not.toContain('<script src="https://api.hanasand.com/api/auth/login-form.js" defer></script>')
         expect(login).toContain('<hanasand-login-form></hanasand-login-form>')

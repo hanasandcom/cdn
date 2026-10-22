@@ -15,7 +15,12 @@ import {
     getSharedAlbumPage,
 } from './handlers/index/staticPages.ts'
 import login from './handlers/auth/login.ts'
-import loginForm from './handlers/auth/loginForm.ts'
+import loginForm, {
+    createDeviceProofBrokerProxy,
+    createDeviceProofBrokerScriptProxy,
+    createDeviceProofClientProxy,
+    createDeviceProofOriginsProxy,
+} from './handlers/auth/loginForm.ts'
 import {
     getPasskeyOptions,
     getSocialProviders,
@@ -91,6 +96,10 @@ fastify.get('/shared/:token', getSharedAlbumPage)
 fastify.get('/login', getLoginPage)
 fastify.post('/api/auth/login', login)
 fastify.get('/api/auth/login-form.js', loginForm)
+fastify.get('/api/auth/device-proof-client.js', createDeviceProofClientProxy())
+fastify.get('/api/auth/device-proof', createDeviceProofBrokerProxy())
+fastify.get('/api/auth/device-proof.js', createDeviceProofBrokerScriptProxy())
+fastify.get('/api/auth/device-proof/origins', createDeviceProofOriginsProxy())
 fastify.get('/api/auth/passkeys/authenticate/options', getPasskeyOptions)
 fastify.post('/api/auth/passkeys/authenticate/verify', postPasskeyVerify)
 fastify.get('/api/auth/social/providers', getSocialProviders)
