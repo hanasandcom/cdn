@@ -44,6 +44,10 @@ export async function postSsoStart(req: FastifyRequest, res: FastifyReply) {
 }
 
 export async function getSsoStart(req: FastifyRequest, res: FastifyReply) {
+    if (String(req.headers.host || '').toLowerCase() !== 'cdn.hanasand.com' || req.protocol !== 'https') {
+        return res.header('Cache-Control', 'no-store').status(400).send({ error: 'Google sign-in must start from the secure CDN site.' })
+    }
+    res.header('Referrer-Policy', 'no-referrer')
     const query = req.query as { redirectPath?: unknown } | undefined
     const body = authStartBody({ binding: randomBytes(32).toString('base64url'), redirectPath: query?.redirectPath })
     if (!body) return res.header('Cache-Control', 'no-store').status(400).send({ error: 'Sign-in request is invalid.' })
