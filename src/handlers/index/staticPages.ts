@@ -34,7 +34,7 @@ const styles = `
 [hidden] { display: none !important; }
 body { margin: 0; min-height: 100vh; padding: 2rem 1rem; display: grid; place-items: center; }
 main { width: min(100%, 58rem); padding: 2rem; border: 1px solid #393939; border-radius: 1rem; background: #101010; }
-main.login-page { width: min(100%, 18rem); max-width: 18rem; padding: 1.25rem; }
+main.login-page { width: min(100%, 28rem); max-width: 28rem; padding: 1.25rem; }
 body.gallery-body { display: block; padding: 0; background: #1c1c1e; }
 main.gallery-page {
     width: 100%; max-width: none; min-height: 100vh; padding: 0; border: 0;
@@ -522,8 +522,7 @@ form.addEventListener('submit', async event => {
 }
 
 export async function getLoginPage(_req: FastifyRequest, res: FastifyReply) {
-    const body = `<p>Sign in to your Hanasand account to upload files and view your library.</p>
-<form id="login" class="login-form">
+    const body = `<form id="login" class="login-form">
 <div class="login-field">
 <label for="username">Username</label>
 <input id="username" name="username" autocomplete="username" required>
