@@ -1,6 +1,5 @@
 import { afterEach, describe, expect, test } from 'bun:test'
-import { getPasskeyOptions, postPasskeyVerify, postSocialStart, postSsoStart } from '../src/handlers/auth/identityFlow.ts'
-import startSso from '../src/handlers/auth/ssoStart.ts'
+import { getPasskeyOptions, getSsoStart, postPasskeyVerify, postSocialStart, postSsoStart } from '../src/handlers/auth/identityFlow.ts'
 import getTargetRouteGroup from '../src/utils/rateLimit/getTargetRouteGroup.ts'
 
 const originalFetch = globalThis.fetch
@@ -161,34 +160,47 @@ describe('CDN Identity login proxies', () => {
         expect(String(res.headers['Set-Cookie'])).toContain('; HttpOnly; Secure; Domain=.hanasand.com')
     })
 
-    test('starts Google sign-in through Hanasand with a validated CDN return address', async () => {
+    test('starts Google sign-in through Identity and returns to the CDN gallery', async () => {
+        let called = ''
+        let sent: Record<string, unknown> | undefined
+        globalThis.fetch = (async (input, init) => {
+            called = String(input)
+            sent = JSON.parse(String(init?.body))
+            return Response.json({ url: 'https://accounts.google.com/o/oauth2/auth' })
+        }) as typeof fetch
         const res = reply()
 
-        await startSso(request({
+        await getSsoStart(request({
             method: 'GET',
             headers: { host: 'cdn.hanasand.com', 'user-agent': 'test-browser' },
             query: { redirectPath: '/gallery' },
         }) as never, res as never)
 
-        const target = new URL(String(res.headers.Location))
-        expect(target.origin).toBe('https://hanasand.com')
-        expect(target.pathname).toBe('/api/auth/sso/start')
-        expect(target.searchParams.get('returnTo')).toBe('https://cdn.hanasand.com/gallery')
+        expect(called).toEndWith('/auth/sso/start')
+        expect(called).toContain('identity')
+        expect(called).not.toContain('hanasand.com')
+        expect(sent?.redirectPath).toBe('https://cdn.hanasand.com/gallery')
+        expect(sent?.binding).toMatch(/^[A-Za-z0-9_-]{43}$/)
+        expect(res.headers.Location).toBe('https://accounts.google.com/o/oauth2/auth')
         expect(res.statusCode).toBe(303)
         expect(res.headers['Cache-Control']).toBe('no-store')
         expect(res.headers['Referrer-Policy']).toBe('no-referrer')
+        expect(String(res.headers['Set-Cookie'])).toContain('hanasand_auth_binding=')
     })
 
-    test('rejects insecure and untrusted CDN SSO start requests', async () => {
+    test('rejects insecure and untrusted CDN SSO start requests before contacting Identity', async () => {
+        let calls = 0
+        globalThis.fetch = (async () => { calls++; return Response.json({ url: 'https://accounts.google.com/' }) }) as typeof fetch
         for (const values of [
             { headers: { host: 'cdn.hanasand.com' }, protocol: 'http' },
             { headers: { host: 'cdn.hanasand.com.attacker.test' }, protocol: 'https' },
         ]) {
             const res = reply()
-            await startSso(request(values) as never, res as never)
+            await getSsoStart(request(values) as never, res as never)
             expect(res.statusCode).toBe(400)
             expect(res.headers.Location).toBeUndefined()
         }
+        expect(calls).toBe(0)
     })
 
     test('puts all sign-in API paths under route rate limits', () => {
