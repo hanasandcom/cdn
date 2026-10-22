@@ -10,6 +10,8 @@ type UserFilesParams = {
 type UserFilesQuery = {
     limit?: string
     offset?: string
+    sort?: string
+    search?: string
 }
 
 export default async function getUserFiles(
@@ -38,17 +40,23 @@ export default async function getUserFiles(
     const limit = Math.min(Math.max(Number.parseInt(req.query.limit || '60', 10) || 60, 1), 100)
 
     const offset = Math.max(0, Math.min(1000000, Number.parseInt(req.query.offset || '0', 10) || 0))
+    const order = req.query.sort === 'uploaded'
+        ? 'uploaded_at DESC, id DESC'
+        : 'COALESCE(photo_taken_at,uploaded_at) DESC, id DESC'
+    const search = typeof req.query.search === 'string' ? req.query.search.trim().slice(0, 120) : ''
 
     try {
         const result = await run(
             `SELECT id, name, description, type, path, owner, uploaded_at,
-                    photo_taken_at, location_label, latitude, longitude,
+                    photo_taken_at, photo_taken_offset_minutes, location_label, latitude, longitude,
                     COALESCE(storage_size,octet_length(data)) AS size_bytes
              FROM files
              WHERE owner = $1
-             ORDER BY uploaded_at DESC, id DESC
+               AND ($4 = '' OR strpos(lower(name),lower($4)) > 0
+                    OR strpos(lower(concat_ws(' ',location_label,latitude::text,longitude::text)),lower($4)) > 0)
+             ORDER BY ${order}
              LIMIT $2 OFFSET $3`,
-            [id, limit, offset]
+            [id, limit, offset, search]
         )
 
         return res.send(result.rows)

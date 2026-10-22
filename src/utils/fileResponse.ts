@@ -1,5 +1,5 @@
 const inlineTypes = new Set([
-    'image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/avif',
+    'image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/avif', 'image/heic', 'image/heif',
     'video/mp4', 'video/webm', 'video/ogg',
 ])
 

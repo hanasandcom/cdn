@@ -4,7 +4,7 @@ import run from '#db'
 import { getSessionUserId } from '#utils/auth/session.ts'
 
 type AlbumParams = { id: string, fileId?: string, userId?: string, token?: string }
-type AlbumQuery = { limit?: string, offset?: string }
+type AlbumQuery = { limit?: string, offset?: string, search?: string }
 type AlbumBody = { name?: unknown, isPublic?: unknown, userId?: unknown, role?: unknown, fileIds?: unknown }
 
 async function signedIn(req: FastifyRequest, res: FastifyReply) {
@@ -85,12 +85,17 @@ export async function getAlbum(req: FastifyRequest<{ Params: AlbumParams, Querys
         FROM photo_albums WHERE id=$1`, [id])
     const limit = Math.min(Math.max(Number.parseInt(req.query.limit || '100', 10) || 100, 1), 100)
     const offset = Math.max(0, Math.min(1_000_000, Number.parseInt(req.query.offset || '0', 10) || 0))
+    const search = typeof req.query.search === 'string' ? req.query.search.trim().slice(0, 120) : ''
     const [items, total] = await Promise.all([run(`SELECT f.id,f.name,f.type,f.uploaded_at,f.photo_taken_at,
-        f.location_label,f.latitude,f.longitude,
+        f.photo_taken_offset_minutes,f.location_label,f.latitude,f.longitude,
         COALESCE(f.storage_size,octet_length(f.data)) AS size_bytes, pi.added_at, pi.added_by
         FROM photo_album_items pi JOIN files f ON f.id=pi.file_id
-        WHERE pi.album_id=$1 ORDER BY COALESCE(f.photo_taken_at,f.uploaded_at) DESC,f.id LIMIT $2 OFFSET $3`, [id, limit, offset]),
-    run('SELECT COUNT(*)::int AS total FROM photo_album_items WHERE album_id=$1', [id])])
+        WHERE pi.album_id=$1 AND ($4='' OR strpos(lower(f.name),lower($4))>0
+            OR strpos(lower(concat_ws(' ',f.location_label,f.latitude::text,f.longitude::text)),lower($4))>0)
+        ORDER BY COALESCE(f.photo_taken_at,f.uploaded_at) DESC,f.id LIMIT $2 OFFSET $3`, [id, limit, offset, search]),
+    run(`SELECT COUNT(*)::int AS total FROM photo_album_items pi JOIN files f ON f.id=pi.file_id
+        WHERE pi.album_id=$1 AND ($2='' OR strpos(lower(f.name),lower($2))>0
+            OR strpos(lower(concat_ws(' ',f.location_label,f.latitude::text,f.longitude::text)),lower($2))>0)`, [id, search])])
     const members = access.owner
         ? await run('SELECT user_id,role,added_at FROM photo_album_members WHERE album_id=$1 ORDER BY user_id', [id])
         : null
@@ -209,13 +214,21 @@ export async function getPublicAlbum(req: FastifyRequest<{ Params: AlbumParams, 
     if (!album.rowCount) return res.status(404).send({ error: 'Album not found.' })
     const limit = Math.min(Math.max(Number.parseInt(req.query.limit || '100', 10) || 100, 1), 100)
     const offset = Math.max(0, Math.min(1_000_000, Number.parseInt(req.query.offset || '0', 10) || 0))
+    const search = typeof req.query.search === 'string' ? req.query.search.trim().slice(0, 120) : ''
     const [items, total] = await Promise.all([run(`SELECT f.id,f.name,f.type,f.uploaded_at,f.photo_taken_at,
-        f.location_label,f.latitude,f.longitude,
+        f.photo_taken_offset_minutes,f.location_label,f.latitude,f.longitude,
         COALESCE(f.storage_size,octet_length(f.data)) AS size_bytes
         FROM photo_album_items pi JOIN files f ON f.id=pi.file_id
-        WHERE pi.album_id=$1 ORDER BY COALESCE(f.photo_taken_at,f.uploaded_at) DESC,f.id
-        LIMIT $2 OFFSET $3`, [album.rows[0].id, limit, offset]),
-    run('SELECT COUNT(*)::int AS total FROM photo_album_items WHERE album_id=$1', [album.rows[0].id])])
+        WHERE pi.album_id=$1 AND ($4='' OR strpos(lower(f.name),lower($4))>0
+            OR strpos(lower(concat_ws(' ',f.location_label,f.latitude::text,f.longitude::text)),lower($4))>0)
+        ORDER BY COALESCE(f.photo_taken_at,f.uploaded_at) DESC,f.id
+        LIMIT $2 OFFSET $3`, [album.rows[0].id, limit, offset, search]),
+    run(`SELECT COUNT(*)::int AS total
+        FROM photo_album_items pi JOIN files f ON f.id=pi.file_id
+        WHERE pi.album_id=$1 AND (
+            $2='' OR strpos(lower(f.name),lower($2))>0
+            OR strpos(lower(concat_ws(' ',f.location_label,f.latitude::text,f.longitude::text)),lower($2))>0
+        )`, [album.rows[0].id, search])])
     return res.send({
         id: album.rows[0].id, name: album.rows[0].name, items: items.rows,
         total: total.rows[0].total, limit, offset,

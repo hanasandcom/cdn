@@ -171,6 +171,16 @@ hanasand-upload-picker:defined > .picker-fallback { display: none; }
 .library-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 1rem; margin-bottom: 1rem; }
 .library-toolbar h2 { margin: 0; font-size: 1.2rem; }
 .library-actions { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem; }
+.library-actions input { width: min(15rem, 35vw); min-height: 2.4rem; padding: .5rem .7rem; font-size: .82rem; }
+.date-timeline { display: grid; gap: .55rem; margin: .25rem 0 1.25rem; }
+.date-range { margin: 0; color: #eee; font-size: 1rem; font-weight: 650; }
+.date-location { margin: -.4rem 0 0; color: #999; font-size: .82rem; }
+.timeline-months { display: flex; gap: .35rem; overflow-x: auto; padding: .1rem 0 .35rem; }
+.timeline-months button {
+    flex: 0 0 auto; min-height: 2rem; border: 1px solid #353535; border-radius: 999px;
+    background: #171717; color: #bbb; padding: .35rem .65rem; font-size: .75rem;
+}
+.timeline-months button:hover, .timeline-months button:focus-visible { background: #303030; color: #fff; }
 .library-actions button, .library-actions select, .album-dialog button {
     min-height: 2.4rem; border: 1px solid #3b3b3b; border-radius: .55rem;
     background: #202020; color: #eee; padding: .5rem .7rem; font-size: .82rem;
@@ -226,6 +236,7 @@ hanasand-upload-picker:defined > .picker-fallback { display: none; }
     .library-section:first-child { grid-column: 1 / -1; }
     .library-nav, .album-nav { padding: .5rem; }
     .library-toolbar { align-items: flex-start; flex-direction: column; }
+    .library-actions input { width: 100%; }
     .photo-grid { grid-template-columns: repeat(auto-fill, minmax(6rem, 1fr)); }
     .photo-viewer { width: 100vw; height: 100dvh; border: 0; border-radius: 0; }
     .viewer-layout { grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1fr) auto; }
@@ -539,12 +550,14 @@ export async function getGalleryPage(_req: FastifyRequest, res: FastifyReply) {
 </aside>
 <section class="library-content" aria-label="Photos">
 <div class="library-toolbar"><h2 id="view-title">Library</h2><div class="library-actions">
+<input id="photo-search" type="search" placeholder="Search photos" aria-label="Search photos" autocomplete="off">
 <span id="selection-count" class="muted" hidden></span>
 <select id="album-target" aria-label="Choose an album"><option value="">Add to album</option></select>
 <button id="add-to-album" type="button" disabled>Add selected</button>
 <button id="manage-album" type="button" hidden>Share</button>
 <button id="load-more" type="button" hidden>Load more</button>
 </div></div>
+<div id="date-timeline" class="date-timeline" aria-label="Browse by date" hidden></div>
 <div id="files" class="library-grid" aria-live="polite" aria-busy="true">
 <span class="loading-indicator" role="status" aria-label="Loading photos"></span></div>
 </section></div>
@@ -576,6 +589,7 @@ export async function getSharedAlbumPage(req: FastifyRequest, res: FastifyReply)
     data-public-token="${encodeURIComponent(token)}" aria-busy="true">
 <section class="library-content" aria-label="Shared album">
 <div class="library-toolbar"><h2 id="view-title">Shared album</h2></div>
+<div id="date-timeline" class="date-timeline" aria-label="Browse by date" hidden></div>
 <div id="files" class="library-grid" aria-live="polite" aria-busy="true">
 <span class="loading-indicator" role="status" aria-label="Loading photos"></span></div>
 <button id="load-more" type="button" hidden>Load more</button>
