@@ -214,7 +214,7 @@ describe('standalone CDN pages', () => {
         expect(login).toContain('<hanasand-login-form login-url="/api/auth/login"')
         expect(login).toContain('passkey-options-url="/api/auth/passkeys/authenticate/options"')
         expect(login).toContain('passkey-verify-url="/api/auth/passkeys/authenticate/verify"')
-        expect(login).toContain('sso-href="/api/auth/sso/start"')
+        expect(login).toContain('sso-href="/api/auth/sso/start?redirectPath=%2Fgallery"')
         expect(login).toContain('redirect-path="/gallery"')
         expect(login).toContain('input:focus, input:focus-visible {')
         expect(login).toContain('background-color: #080808; color: #f6f6f3; border-color: #707070;')
@@ -242,11 +242,11 @@ describe('standalone CDN pages', () => {
     test('keeps login return paths on CDN and escapes markup', async () => {
         const { html } = await page(getLoginPage, { query: { returnTo: '/gallery?sort=date&view=images' } })
         expect(html).toContain('redirect-path="/gallery?sort=date&amp;view=images"')
-        expect(html).toContain('sso-href="/api/auth/sso/start"')
+        expect(html).toContain('sso-href="/api/auth/sso/start?redirectPath=%2Fgallery%3Fsort%3Ddate%26view%3Dimages"')
 
         const { html: unsafe } = await page(getLoginPage, { query: { returnTo: '//attacker.example/path' } })
         expect(unsafe).toContain('redirect-path="/gallery"')
-        expect(unsafe).toContain('sso-href="/api/auth/sso/start"')
+        expect(unsafe).toContain('sso-href="/api/auth/sso/start?redirectPath=%2Fgallery"')
     })
 
     test('serves the shared picker and image metadata assets', async () => {

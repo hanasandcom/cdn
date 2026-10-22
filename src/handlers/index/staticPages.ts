@@ -1,6 +1,7 @@
 import type { FastifyReply, FastifyRequest } from 'fastify'
 import { readFile } from 'node:fs/promises'
 import { getSessionDetails, setSessionCookies } from '#utils/auth/session.ts'
+import { safeCdnReturnPath } from '#utils/auth/safeCdnReturnPath.ts'
 
 const uploadPickerPath = new URL('../../client/upload-picker.js', import.meta.url)
 const galleryClientPath = new URL('../../client/gallery.js', import.meta.url)
@@ -617,27 +618,12 @@ form.addEventListener('submit', async event => {
 export async function getLoginPage(req: FastifyRequest, res: FastifyReply) {
     const query = req.query as { returnTo?: unknown } | undefined
     const redirectPath = safeCdnReturnPath(query?.returnTo)
-    const ssoHref = '/api/auth/sso/start'
+    const ssoHref = `/api/auth/sso/start?redirectPath=${encodeURIComponent(redirectPath)}`
     const body = `<hanasand-login-form login-url="/api/auth/login"
 passkey-options-url="/api/auth/passkeys/authenticate/options"
 passkey-verify-url="/api/auth/passkeys/authenticate/verify"
 sso-href="${escapeHtmlAttribute(ssoHref)}" redirect-path="${escapeHtmlAttribute(redirectPath)}"></hanasand-login-form>`
     return res.header('Cache-Control', 'private, no-store').type('text/html').send(shell('Sign in', body, { mainClass: 'login-page' }))
-}
-
-function safeCdnReturnPath(value: unknown) {
-    if (typeof value !== 'string' || value.length > 2048 || !value.startsWith('/') || value.startsWith('//')
-        || value.includes('\\') || [...value].some(char => char.charCodeAt(0) < 32 || char.charCodeAt(0) === 127)) {
-        return '/gallery'
-    }
-    try {
-        const url = new URL(value, 'https://cdn.hanasand.com')
-        return url.origin === 'https://cdn.hanasand.com' && !url.username && !url.password
-            ? `${url.pathname}${url.search}${url.hash}`
-            : '/gallery'
-    } catch {
-        return '/gallery'
-    }
 }
 
 function escapeHtmlAttribute(value: string) {
