@@ -130,11 +130,10 @@ describe('shared login form proxy', () => {
     test('groups the shared login asset under public read limits', () => {
         expect(getTargetRouteGroup('/api/auth/login-form.js')).toBe('/api/auth/login-form.js')
         expect(getTargetRouteGroup('/api/auth/login-form.js/extra')).toBeNull()
-        expect(getTargetRouteGroup('/api/auth/device-proof-client.js')).toBe('/api/auth/device-proof-client.js')
     })
 
     test('proxies the fixed Identity login asset with safe headers', async () => {
-        const { createIdentityClientScriptProxy } = await import('../src/handlers/auth/identityClientScript.ts')
+        const { createLoginFormProxy } = await import('../src/handlers/auth/loginForm.ts')
         let body: Buffer | undefined
         const headers: Record<string, string> = {}
         const reply = {
@@ -143,7 +142,7 @@ describe('shared login form proxy', () => {
             send: (value: Buffer) => { body = value; return value },
         }
         let requested = ''
-        const handler = createIdentityClientScriptProxy('login-form.js', 'http://identity:8081/api', async (input, init) => {
+        const handler = createLoginFormProxy('http://identity:8081/api', async (input, init) => {
             requested = String(input)
             expect(init?.redirect).toBe('error')
             expect(init?.cache).toBe('no-store')
@@ -162,18 +161,18 @@ describe('shared login form proxy', () => {
     })
 
     test('rejects redirects and oversized or non-JavaScript responses', async () => {
-        const { createIdentityClientScriptProxy } = await import('../src/handlers/auth/identityClientScript.ts')
+        const { createLoginFormProxy } = await import('../src/handlers/auth/loginForm.ts')
         const statusCodes: number[] = []
         const reply = {
             header: () => reply,
             status: (status: number) => { statusCodes.push(status); return reply },
             send: () => reply,
         }
-        const nonJavaScript = createIdentityClientScriptProxy('login-form.js', 'http://identity:8081/api', async () => new Response('<html>not a script</html>', {
+        const nonJavaScript = createLoginFormProxy('http://identity:8081/api', async () => new Response('<html>not a script</html>', {
             status: 200,
             headers: { 'content-type': 'text/html' },
         }))
-        const oversized = createIdentityClientScriptProxy('login-form.js', 'http://identity:8081/api', async () => new Response('x'.repeat(70 * 1024), {
+        const oversized = createLoginFormProxy('http://identity:8081/api', async () => new Response('x'.repeat(70 * 1024), {
             status: 200,
             headers: { 'content-type': 'application/javascript' },
         }))
@@ -269,10 +268,8 @@ describe('standalone CDN pages', () => {
         expect(login).toContain('main.login-page { width: min(100%, 28rem); max-width: 28rem;')
         expect(login).not.toContain('Sign in to your Hanasand account to upload files and view your library.')
         expect(login).toContain('<script src="/api/auth/login-form.js" defer></script>')
-        expect(login).toContain('<script src="/api/auth/device-proof-client.js"></script>')
         expect(login).not.toContain('<script src="https://identity.hanasand.com/api/auth/login-form.js" defer></script>')
         expect(login).not.toContain('<script src="https://api.hanasand.com/api/auth/login-form.js" defer></script>')
-        expect(login).not.toContain('https://api.hanasand.com/api/auth/device-proof-client.js')
         expect(login).toContain('<hanasand-login-form></hanasand-login-form>')
         expect(login).toContain('input:focus, input:focus-visible {')
         expect(login).toContain('background-color: #080808; color: #f6f6f3; border-color: #707070;')

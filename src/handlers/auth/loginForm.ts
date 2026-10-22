@@ -3,18 +3,13 @@ import config from '#constants'
 
 const maxLoginFormBytes = 64 * 1024
 const timeoutMs = 5_000
-export type IdentityClientScript = 'login-form.js' | 'device-proof-client.js'
 
 type Fetcher = typeof fetch
 
-export function createIdentityClientScriptProxy(
-    script: IdentityClientScript,
-    authApi = config.auth_api,
-    fetcher: Fetcher = fetch,
-) {
+export function createLoginFormProxy(authApi = config.auth_api, fetcher: Fetcher = fetch) {
     return async (_req: FastifyRequest, res: FastifyReply) => {
         try {
-            const response = await fetcher(`${authApi}/auth/${script}`, {
+            const response = await fetcher(`${authApi}/auth/login-form.js`, {
                 cache: 'no-store',
                 redirect: 'error',
                 signal: AbortSignal.timeout(timeoutMs),
@@ -70,5 +65,4 @@ async function readBoundedBody(response: Response): Promise<Buffer | undefined> 
     }
 }
 
-export const loginForm = createIdentityClientScriptProxy('login-form.js')
-export const deviceProofClient = createIdentityClientScriptProxy('device-proof-client.js')
+export default createLoginFormProxy()
