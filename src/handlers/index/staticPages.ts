@@ -343,7 +343,7 @@ function shell(title: string, body: string, options: { mainClass?: string, showB
     const brand = options.showBrand === false ? '' : '<a href="/" aria-label="Hanasand CDN">Hanasand CDN</a>'
     const bodyClass = options.mainClass === 'gallery-page' ? 'gallery-body' : ''
     const loginScript = options.mainClass === 'login-page'
-        ? '<script src="/api/auth/login-form.js" defer></script>'
+        ? '<link rel="stylesheet" href="/assets/login-form.css"><script type="module" src="/assets/login-form.js"></script>'
         : ''
     return `<!doctype html>
 <html lang="en">
@@ -608,10 +608,12 @@ export async function getLoginPage(req: FastifyRequest, res: FastifyReply) {
     const query = req.query as { returnTo?: unknown } | undefined
     const redirectPath = safeCdnReturnPath(query?.returnTo)
     const ssoHref = `/api/auth/sso/start?redirectPath=${encodeURIComponent(redirectPath)}`
-    const body = `<hanasand-login-form login-url="/api/auth/login"
+    const body = `<form id="cdn-login-form" action="/api/auth/login" method="post">
+<hanasand-login-form
 passkey-options-url="/api/auth/passkeys/authenticate/options"
 passkey-verify-url="/api/auth/passkeys/authenticate/verify"
-sso-href="${escapeHtmlAttribute(ssoHref)}" redirect-path="${escapeHtmlAttribute(redirectPath)}"></hanasand-login-form>`
+sso-href="${escapeHtmlAttribute(ssoHref)}" redirect-path="${escapeHtmlAttribute(redirectPath)}"></hanasand-login-form>
+</form>`
     return res.header('Cache-Control', 'private, no-store').type('text/html').send(shell('Sign in', body, { mainClass: 'login-page' }))
 }
 

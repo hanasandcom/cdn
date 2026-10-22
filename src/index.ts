@@ -14,7 +14,7 @@ import {
     getSharedAlbumPage,
 } from './handlers/index/staticPages.ts'
 import login from './handlers/auth/login.ts'
-import loginForm from './handlers/auth/loginForm.ts'
+import { getLoginFormScript, getLoginFormStyles } from './handlers/auth/loginAssets.ts'
 import {
     getPasskeyOptions,
     getSocialProviders,
@@ -89,7 +89,8 @@ fastify.get('/gallery', getGalleryPage)
 fastify.get('/shared/:token', getSharedAlbumPage)
 fastify.get('/login', getLoginPage)
 fastify.post('/api/auth/login', login)
-fastify.get('/api/auth/login-form.js', loginForm)
+fastify.get('/assets/login-form.js', getLoginFormScript)
+fastify.get('/assets/login-form.css', getLoginFormStyles)
 fastify.get('/api/auth/passkeys/authenticate/options', getPasskeyOptions)
 fastify.post('/api/auth/passkeys/authenticate/verify', postPasskeyVerify)
 fastify.get('/api/auth/social/providers', getSocialProviders)

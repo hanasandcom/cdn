@@ -5,7 +5,8 @@ export const MISS_WINDOW_MS = 60_000
 export const CLEANUP_INTERVAL_MS = 5 * 60_000
 
 export const TARGET_ROUTE_GROUPS = [
-    '/api/auth/login-form.js',
+    '/assets/login-form.js',
+    '/assets/login-form.css',
     '/api/auth/passkeys/authenticate/',
     '/api/auth/social/providers',
     '/api/auth/social/',

@@ -6,10 +6,6 @@ export default function getTargetRouteGroup(url: string) {
     if (path === '/api/files/check') {
         return '/api/files/check'
     }
-    if (path === '/api/auth/login-form.js') {
-        return '/api/auth/login-form.js'
-    }
-
     for (const prefix of TARGET_ROUTE_GROUPS) {
         if (prefix.endsWith('/') ? path.startsWith(prefix) : path === prefix) {
             return prefix
