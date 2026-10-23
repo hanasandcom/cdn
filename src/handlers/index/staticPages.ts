@@ -208,8 +208,8 @@ hanasand-upload-picker:defined > .picker-fallback { display: none; }
     border-right: 1px solid #343436; background: #202023;
 }
 .library-section { display: grid; gap: .35rem; }
-.library-section:not(.has-owned-albums) > h2,
-.library-section:not(.has-owned-albums) > #owned-albums { display: none; }
+#owned-albums-section:not(.has-owned-albums) > h2,
+#owned-albums-section:not(.has-owned-albums) > #owned-albums { display: none; }
 .library-sidebar-content { display: grid; align-content: start; gap: 1.25rem; }
 .library-section h2 { margin: 0 0 .25rem; color: #999; font-size: .72rem; letter-spacing: .08em; text-transform: uppercase; }
 .library-nav, .album-nav {
@@ -709,7 +709,7 @@ export async function getGalleryPage(_req: FastifyRequest, res: FastifyReply) {
 <span aria-hidden="true">▧</span><span class="library-nav-label">Images</span></button>
 <button class="library-nav" data-view="videos" aria-label="Videos" title="Videos">
 <span aria-hidden="true">▷</span><span class="library-nav-label">Videos</span></button></div>
-<div class="library-section"><h2>Albums</h2><div id="owned-albums"></div>
+<div class="library-section" id="owned-albums-section"><h2>Albums</h2><div id="owned-albums"></div>
 <button id="create-album" class="new-album" type="button" aria-label="New album" title="New album">＋ New album</button></div>
 <div class="library-section" id="shared-albums-section" hidden><h2>Shared with me</h2><div id="shared-albums"></div></div>
 </div>
