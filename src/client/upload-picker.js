@@ -199,18 +199,18 @@
                     * { box-sizing: border-box; }
                     [hidden] { display: none !important; }
                     button, input { font: inherit; }
-                    .panel { display: grid; overflow: hidden; grid-template-columns: minmax(0, 1fr); border: 1px solid var(--ui-border, #393939); border-radius: .75rem; background: var(--ui-panel, #101010); box-shadow: 0 8px 24px #0005; }
-                    .drop-side { display: grid; min-height: 11rem; place-items: center; border-bottom: 1px solid var(--ui-border, #393939); background: var(--ui-raised, #191919); padding: .75rem; }
-                    .dropzone { display: grid; width: 100%; min-height: 9rem; place-content: center; justify-items: center; gap: 1rem; border: 1px dashed var(--ui-border, #393939); border-radius: .75rem; background: var(--ui-panel, #101010); padding: 1.25rem; text-align: center; cursor: pointer; transition: border-color .15s, background .15s; }
+                    .panel { display: grid; overflow: hidden; grid-template-columns: minmax(0, 1fr); border: 1px solid var(--ui-border, #383838); border-radius: .75rem; background: var(--ui-panel, #101010); box-shadow: 0 8px 24px #0005; }
+                    .drop-side { display: grid; min-height: 11rem; place-items: center; border-bottom: 1px solid var(--ui-border, #383838); background: var(--ui-raised, #191919); padding: .75rem; }
+                    .dropzone { display: grid; width: 100%; min-height: 9rem; place-content: center; justify-items: center; gap: 1rem; border: 1px dashed var(--ui-border, #383838); border-radius: .75rem; background: var(--ui-panel, #101010); padding: 1.25rem; text-align: center; cursor: pointer; transition: border-color .15s, background .15s; }
                     .dropzone:hover, .dropzone.dragging, .dropzone:focus-visible { border-color: var(--ui-primary, #f6f6f3); background: color-mix(in srgb, var(--ui-primary, #f6f6f3) 8%, var(--ui-panel, #101010)); outline: none; }
-                    .drop-icon { display: grid; width: 3rem; height: 3rem; place-items: center; border: 1px solid var(--ui-border, #393939); border-radius: .65rem; color: var(--ui-primary, #f6f6f3); font-size: 1.5rem; }
+                    .drop-icon { display: grid; width: 3rem; height: 3rem; place-items: center; border: 1px solid var(--ui-border, #383838); border-radius: .65rem; color: var(--ui-primary, #f6f6f3); font-size: 1.5rem; }
                     .drop-title { color: var(--ui-text, #f6f6f3); font-size: .875rem; font-weight: 650; }
-                    .muted { color: var(--ui-muted, #aaa); font-size: .8rem; }
+                    .muted { color: var(--ui-muted, #999); font-size: .8rem; }
                     .upload-side { display: grid; min-width: 0; align-content: start; gap: 1rem; padding: 1.25rem; }
-                    .description { margin: 0; color: var(--ui-muted, #aaa); font-size: .875rem; line-height: 1.5; }
-                    .browse-button, .camera-button, .review-button, .pager button, .remove-button { display: inline-flex; min-height: 2.75rem; align-items: center; justify-content: center; border: 1px solid var(--ui-border, #393939); border-radius: .6rem; background: var(--ui-text, #f6f6f3); color: var(--ui-canvas, #111); padding: .7rem .85rem; font-size: .875rem; font-weight: 650; text-align: center; cursor: pointer; }
+                    .description { margin: 0; color: var(--ui-muted, #999); font-size: .875rem; line-height: 1.5; }
+                    .browse-button, .camera-button, .review-button, .pager button, .remove-button { display: inline-flex; min-height: 2.75rem; align-items: center; justify-content: center; border: 1px solid var(--ui-border, #383838); border-radius: .6rem; background: var(--ui-text, #f6f6f3); color: var(--ui-canvas, #111); padding: .7rem .85rem; font-size: .875rem; font-weight: 650; text-align: center; cursor: pointer; }
                     .browse-button { position: relative; width: 100%; overflow: hidden; border-color: transparent; }
-                    .camera-button, .pager button, .remove-button { background: var(--ui-raised, #202020); color: var(--ui-text, #f6f6f3); }
+                    .camera-button, .pager button, .remove-button { background: var(--ui-raised, #191919); color: var(--ui-text, #f6f6f3); }
                     .camera-button:hover, .pager button:not(:disabled):hover, .remove-button:hover { border-color: var(--ui-primary, #f6f6f3); }
                     .review-button { width: 100%; border-color: var(--ui-primary, #f6f6f3); background: var(--ui-primary, #f6f6f3); color: var(--ui-on-primary, #111); }
                     .browse-button:hover, .review-button:hover { opacity: .9; }
@@ -219,24 +219,24 @@
                     .camera-button { width: 100%; }
                     .camera-wrap { position: relative; }
                     .file-list { display: grid; max-height: 20rem; gap: .5rem; overflow: auto; margin: 0; padding: 0; list-style: none; }
-                    .list-heading { display: flex; align-items: center; justify-content: space-between; gap: .5rem; color: var(--ui-muted, #aaa); font-size: .75rem; }
+                    .list-heading { display: flex; align-items: center; justify-content: space-between; gap: .5rem; color: var(--ui-muted, #999); font-size: .75rem; }
                     .pager { display: flex; align-items: center; gap: .35rem; }
                     .pager button { min-height: 2rem; padding: .3rem .45rem; font-size: .7rem; }
                     .pager button:disabled { cursor: default; opacity: .5; }
-                    .item { display: grid; grid-template-columns: 3.5rem minmax(0, 1fr) auto; align-items: center; gap: .65rem; padding: .5rem; border: 1px solid var(--ui-border, #393939); border-radius: .6rem; background: var(--ui-canvas, #080808); }
-                    .thumb { width: 3.5rem; height: 3.5rem; border-radius: .4rem; object-fit: cover; background: var(--ui-raised, #161616); }
+                    .item { display: grid; grid-template-columns: 3.5rem minmax(0, 1fr) auto; align-items: center; gap: .65rem; padding: .5rem; border: 1px solid var(--ui-border, #383838); border-radius: .6rem; background: var(--ui-canvas, #080808); }
+                    .thumb { width: 3.5rem; height: 3.5rem; border-radius: .4rem; object-fit: cover; background: var(--ui-raised, #191919); }
                     .name { overflow-wrap: anywhere; margin: 0; color: var(--ui-text, #f6f6f3); font-size: .875rem; font-weight: 600; }
-                    .meta { display: flex; flex-wrap: wrap; align-items: center; gap: .3rem .75rem; overflow-wrap: anywhere; margin: .2rem 0 0; color: var(--ui-muted, #aaa); font-size: .7rem; line-height: 1.45; }
+                    .meta { display: flex; flex-wrap: wrap; align-items: center; gap: .3rem .75rem; overflow-wrap: anywhere; margin: .2rem 0 0; color: var(--ui-muted, #999); font-size: .7rem; line-height: 1.45; }
                     .metadata-item { display: inline-flex; min-width: 0; align-items: center; gap: .25rem; }
                     .metadata-item svg { width: .9rem; height: .9rem; flex: none; stroke: currentColor; stroke-width: 1.75; fill: none; stroke-linecap: round; stroke-linejoin: round; }
                     .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; }
                     .remove-button { min-height: 2rem; padding: .4rem .55rem; font-size: .75rem; }
                     .file-actions { display: grid; gap: .35rem; }
-                    .file-upload-state { overflow-wrap: anywhere; margin: .35rem 0 0; color: var(--ui-muted, #aaa); font-size: .72rem; }
+                    .file-upload-state { overflow-wrap: anywhere; margin: .35rem 0 0; color: var(--ui-muted, #999); font-size: .72rem; }
                     .file-upload-state.has-error { color: #ffb4ab; }
-                    .retry-button { min-height: 2rem; padding: .35rem .55rem; border: 1px solid var(--ui-border, #555); border-radius: .5rem; background: var(--ui-raised, #252527); color: var(--ui-text, #f6f6f3); font-size: .75rem; cursor: pointer; }
+                    .retry-button { min-height: 2rem; padding: .35rem .55rem; border: 1px solid var(--ui-border, #383838); border-radius: .5rem; background: var(--ui-raised, #191919); color: var(--ui-text, #f6f6f3); font-size: .75rem; cursor: pointer; }
                     .extras, .actions { display: grid; gap: .75rem; }
-                    @media (min-width: 48rem) { .panel { grid-template-columns: minmax(0, 1.05fr) minmax(0, .95fr); } .drop-side { min-height: 26.25rem; border-right: 1px solid var(--ui-border, #393939); border-bottom: 0; padding: 1.5rem; } .dropzone { min-height: 21rem; padding: 2rem; } .upload-side { gap: 1.25rem; padding: 1.5rem; } }
+                    @media (min-width: 48rem) { .panel { grid-template-columns: minmax(0, 1.05fr) minmax(0, .95fr); } .drop-side { min-height: 26.25rem; border-right: 1px solid var(--ui-border, #383838); border-bottom: 0; padding: 1.5rem; } .dropzone { min-height: 21rem; padding: 2rem; } .upload-side { gap: 1.25rem; padding: 1.5rem; } }
                 </style>
                 <div class="panel">
                     <div class="drop-side"><div class="dropzone" id="dropzone" role="button" tabindex="0" aria-label="Drop files here or browse files"><span class="drop-icon" aria-hidden="true">↑</span><strong class="drop-title">Drop files here</strong><span class="muted">or choose files to upload</span></div></div>
@@ -367,7 +367,7 @@
                 row.className = 'item'
                 image.className = 'thumb'
                 image.alt = /^image\//i.test(file.type) ? '' : 'File'
-                image.src = previewable ? URL.createObjectURL(file) : 'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 56 56"><rect width="56" height="56" fill="#161616"/><text x="28" y="36" text-anchor="middle" fill="#aaa" font-size="28">▤</text></svg>')
+                image.src = previewable ? URL.createObjectURL(file) : 'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 56 56"><rect width="56" height="56" fill="#191919"/><text x="28" y="36" text-anchor="middle" fill="#999" font-size="28">▤</text></svg>')
                 if (image.src.startsWith('blob:')) this.objectUrls.push(image.src)
                 name.className = 'name'
                 name.textContent = file.name

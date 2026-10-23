@@ -7,7 +7,7 @@ export default async function getIndex(_req: FastifyRequest, res: FastifyReply) 
 <meta name="viewport" content="width=device-width">
 <title>Hanasand CDN</title>
 <style>
-:root { color-scheme: dark; --bg: #050505; --panel: #0b0b0b; --line: #393939; }
+:root { color-scheme: dark; --bg: #070707; --panel: #101010; --line: #383838; }
 * { box-sizing: border-box; }
 body {
     font: 16px system-ui, -apple-system, sans-serif;
@@ -15,12 +15,12 @@ body {
     color: #f6f6f3; display: grid; min-height: 100vh; margin: 0; place-items: center; padding: 1rem;
 }
 main {
-    max-width: 36rem; padding: 2rem; text-align: center; border: 1px solid rgba(255,255,255,.12);
+    max-width: 36rem; padding: 2rem; text-align: center; border: 1px solid rgba(255,255,255,.10);
     border-radius: 1.25rem; background: linear-gradient(180deg, #101010, var(--panel));
     box-shadow: 0 24px 80px rgba(0,0,0,.4);
 }
 h1 { font-size: 2.5rem; letter-spacing: -.04em; }
-p { color: #a1a1a1; line-height: 1.6; }
+p { color: #999; line-height: 1.6; }
 .actions { display: flex; flex-wrap: wrap; justify-content: center; gap: .75rem; margin-top: 1.5rem; }
 a {
     display: inline-flex; align-items: center; justify-content: center; min-height: 2.75rem;
