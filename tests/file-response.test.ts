@@ -4,6 +4,8 @@ import {
     getBulkUploadScript,
     getGalleryClientScript,
     getGalleryPage,
+    getHanasandChromeStylesheet,
+    getHanasandLogo,
     getLoginPage,
     getUploadPage,
     getUploadPickerScript,
@@ -28,6 +30,8 @@ async function page(handler: typeof getUploadPage, request = {}) {
 type ScriptHandler = typeof getUploadPickerScript | typeof getBulkUploadScript
     | typeof getGalleryClientScript | typeof getExifReaderScript
 
+type AssetHandler = typeof getHanasandChromeStylesheet | typeof getHanasandLogo
+
 async function script(handler: ScriptHandler) {
     let body = ''
     const reply = {
@@ -37,6 +41,18 @@ async function script(handler: ScriptHandler) {
     }
     await handler({} as never, reply as never)
     return body
+}
+
+async function asset(handler: AssetHandler) {
+    let body: Buffer = Buffer.alloc(0)
+    const headers: Record<string, string> = {}
+    const reply = {
+        header: (name: string, value: string) => { headers[name] = value; return reply },
+        type: (value: string) => { headers['Content-Type'] = value; return reply },
+        send: (value: Buffer) => { body = value; return body },
+    }
+    await handler({} as never, reply as never)
+    return { body, headers }
 }
 
 describe('file response safety', () => {
@@ -186,6 +202,13 @@ describe('standalone CDN pages', () => {
         expect(uploadClient).toContain('data.append(`files:${item.key}`')
         expect(uploadClient).toContain('credentials: \'same-origin\'')
         expect(gallery).toContain('id="photo-library"')
+        expect(gallery).toContain('class="hanasand-header cdn-header cdn-header--gallery cdn-header--hide-brand"')
+        expect(gallery).toContain('class="cdn-header-actions"')
+        expect(gallery).toContain('href="/assets/hanasand-logo.png"')
+        expect(gallery).toContain('aria-label="Gallery"')
+        expect(gallery).toContain('aria-label="Upload"')
+        expect(gallery).toContain('class="hanasand-header__brand"')
+        expect(gallery).toContain('.cdn-header--hide-brand .hanasand-header__brand { display: none; }')
         expect(gallery).toContain('id="photo-library-sidebar"')
         expect(gallery).toContain('id="library-menu-toggle"')
         expect(gallery).toContain('id="selection-actions" class="selection-actions" hidden')
@@ -260,6 +283,18 @@ describe('standalone CDN pages', () => {
         expect(uploadHeaders['Cache-Control']).toBe('private, no-store')
         expect(galleryHeaders['Cache-Control']).toBe('private, no-store')
         expect(loginHeaders['Cache-Control']).toBe('private, no-store')
+    })
+
+    test('serves the published shared chrome CSS and brand asset', async () => {
+        const chrome = await asset(getHanasandChromeStylesheet)
+        const logo = await asset(getHanasandLogo)
+
+        expect(chrome.headers['Content-Type']).toBe('text/css')
+        expect(chrome.headers['Cache-Control']).toBe('public, max-age=86400')
+        expect(chrome.body.toString()).toContain('.hanasand-header')
+        expect(logo.headers['Content-Type']).toBe('image/png')
+        expect(logo.headers['Cache-Control']).toBe('public, max-age=86400')
+        expect(logo.body.length).toBeGreaterThan(0)
     })
 
     test('keeps login return paths on CDN and escapes markup', async () => {

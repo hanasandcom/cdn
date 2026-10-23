@@ -10,6 +10,8 @@ import {
     getGalleryClientScript,
     getAuthClientScript,
     getAuthClientStylesheet,
+    getHanasandChromeStylesheet,
+    getHanasandLogo,
     getLoginPage,
     getUploadPage,
     getUploadPickerScript,
@@ -95,6 +97,8 @@ fastify.post('/api/auth/login', login)
 fastify.get('/api/auth/sso/start', getSsoStart)
 fastify.get('/assets/login-form.js', getAuthClientScript)
 fastify.get('/assets/login-form.css', getAuthClientStylesheet)
+fastify.get('/assets/hanasand-chrome.css', getHanasandChromeStylesheet)
+fastify.get('/assets/hanasand-logo.png', getHanasandLogo)
 fastify.get('/api/auth/passkeys/authenticate/options', getPasskeyOptions)
 fastify.post('/api/auth/passkeys/authenticate/verify', postPasskeyVerify)
 fastify.get('/api/auth/social/providers', getSocialProviders)

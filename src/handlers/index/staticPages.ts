@@ -1,5 +1,8 @@
 import type { FastifyReply, FastifyRequest } from 'fastify'
 import { readFile } from 'node:fs/promises'
+import { createElement } from 'react'
+import { renderToStaticMarkup } from 'react-dom/server'
+import { Header } from 'hanasand'
 import { renderHanasandLoginFormMarkup } from 'hanasand/auth'
 import { getSessionDetails, setSessionCookies } from '#utils/auth/session.ts'
 import { safeCdnReturnPath } from '#utils/auth/safeCdnReturnPath.ts'
@@ -10,6 +13,8 @@ const galleryClientPath = new URL('../../client/gallery.js', import.meta.url)
 const exifReaderPath = new URL('../../../node_modules/exifreader/dist/exif-reader.js', import.meta.url)
 const authClientScriptPath = new URL('../../../dist/client/auth.js', import.meta.url)
 const authClientStylesheetPath = new URL('../../../dist/client/auth.css', import.meta.url)
+const hanasandChromeStylesheetPath = new URL(import.meta.resolve('hanasand/chrome.css'))
+const hanasandLogoPath = new URL('./assets/hanasand-logo.png', import.meta.resolve('hanasand'))
 export async function getUploadPickerScript(_req: FastifyRequest, res: FastifyReply) {
     const script = await readFile(uploadPickerPath)
     return res.header('Cache-Control', 'no-store').type('text/javascript').send(script)
@@ -35,6 +40,14 @@ export async function getAuthClientStylesheet(_req: FastifyRequest, res: Fastify
     return res.header('Cache-Control', 'no-store').type('text/css').send(await readFile(authClientStylesheetPath))
 }
 
+export async function getHanasandChromeStylesheet(_req: FastifyRequest, res: FastifyReply) {
+    return res.header('Cache-Control', 'public, max-age=86400').type('text/css').send(await readFile(hanasandChromeStylesheetPath))
+}
+
+export async function getHanasandLogo(_req: FastifyRequest, res: FastifyReply) {
+    return res.header('Cache-Control', 'public, max-age=86400').type('image/png').send(await readFile(hanasandLogoPath))
+}
+
 const styles = `
 :root { color-scheme: dark; font: 16px system-ui, sans-serif; background: #050505; color: #f6f6f3; }
 * { box-sizing: border-box; }
@@ -50,6 +63,10 @@ main.gallery-page {
 main.gallery-page > h1 { display: none; }
 a { color: inherit; }
 header { display: flex; justify-content: space-between; align-items: center; gap: 1rem; }
+.hanasand-header.cdn-header { width: 100%; margin-bottom: 1.5rem; }
+.hanasand-header.cdn-header .hanasand-header__links { display: none; }
+.cdn-header-actions { display: flex; min-width: 0; align-items: center; gap: .5rem; margin-left: auto; }
+.cdn-header--hide-brand .hanasand-header__brand { display: none; }
 main.login-page header { flex-wrap: wrap; }
 h1 { font-size: 2rem; margin: .5rem 0; }
 p { color: #aaa; line-height: 1.5; }
@@ -399,10 +416,43 @@ hanasand-upload-picker:defined > .picker-fallback { display: none; }
 `
 
 function shell(title: string, body: string, options: {
-    mainClass?: string, showBrand?: boolean, showLibraryToggle?: boolean, account?: string
+    mainClass?: string, showBrand?: boolean, showLibraryToggle?: boolean, account?: boolean
 } = {}) {
-    const brand = options.showBrand === false ? '' : '<a href="/" aria-label="Hanasand CDN">Hanasand CDN</a>'
     const bodyClass = options.mainClass === 'gallery-page' ? 'gallery-body' : ''
+    const icon = (path: string, extra?: string) => createElement('svg', {
+        viewBox: '0 0 24 24', 'aria-hidden': 'true', ...(extra ? { className: extra } : {}),
+    }, createElement('path', { d: path }))
+    const libraryToggle = options.showLibraryToggle ? createElement('button', {
+        id: 'library-menu-toggle', type: 'button', 'aria-controls': 'photo-library-sidebar',
+        'aria-expanded': 'false', 'aria-label': 'Browse library', title: 'Browse library',
+    }, icon('M4 6h16M4 12h16M4 18h16')) : null
+    const galleryLink = createElement('a', {
+        className: 'gallery-nav-link', href: '/gallery', 'aria-label': 'Gallery', title: 'Gallery',
+    }, createElement('svg', { viewBox: '0 0 24 24', 'aria-hidden': 'true' },
+        createElement('rect', { x: '3', y: '3', width: '8', height: '8', rx: '1' }),
+        createElement('rect', { x: '13', y: '3', width: '8', height: '8', rx: '1' }),
+        createElement('rect', { x: '3', y: '13', width: '8', height: '8', rx: '1' }),
+        createElement('rect', { x: '13', y: '13', width: '8', height: '8', rx: '1' })))
+    const uploadLink = createElement('a', {
+        className: 'gallery-nav-link', href: '/upload', 'aria-label': 'Upload', title: 'Upload',
+    }, createElement('svg', { viewBox: '0 0 24 24', 'aria-hidden': 'true' },
+        createElement('path', { d: 'M12 16V4m0 0L7 9m5-5 5 5M5 14v5a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-5' })))
+    const accountActions = options.account ? createElement('div', { className: 'account-actions' },
+        createElement('span', { className: 'profile-icon', 'aria-label': 'Profile' },
+            createElement('svg', { viewBox: '0 0 24 24', 'aria-hidden': 'true' },
+                createElement('circle', { cx: '12', cy: '8', r: '4' }),
+                createElement('path', { d: 'M4 21a8 8 0 0 1 16 0' }))),
+        createElement('a', { className: 'sign-out', href: '/logout' }, 'Sign out')) : null
+    const actions = createElement('div', { className: 'cdn-header-actions' }, libraryToggle, galleryLink, uploadLink, accountActions)
+    const sharedHeader = renderToStaticMarkup(createElement(Header, {
+        brandHref: '/', brandLabel: 'Hanasand CDN', logoSrc: '/assets/hanasand-logo.png',
+        links: [], actions,
+        className: [
+            'cdn-header',
+            options.mainClass === 'gallery-page' ? 'cdn-header--gallery' : '',
+            options.showBrand === false ? 'cdn-header--hide-brand' : '',
+        ].filter(Boolean).join(' '),
+    }))
     const loginAssets = options.mainClass === 'login-page'
         ? '<link rel="stylesheet" href="/assets/login-form.css"><script src="/assets/login-form.js" defer></script>'
         : ''
@@ -411,37 +461,17 @@ function shell(title: string, body: string, options: {
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width">
 <title>${title} · Hanasand CDN</title>
+<link rel="stylesheet" href="/assets/hanasand-chrome.css">
 <style>${styles}</style>
 ${loginAssets}
 <body class="${bodyClass}">
 <main class="${options.mainClass || ''}">
-<header>${brand}
-<nav>
-${options.showLibraryToggle ? `<button id="library-menu-toggle" type="button" aria-controls="photo-library-sidebar"
-aria-expanded="false" aria-label="Browse library" title="Browse library">
-<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16"/></svg></button>
-` : ''}
-<a class="gallery-nav-link" href="/gallery" aria-label="Gallery" title="Gallery">
-<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="8" height="8" rx="1"/>
-<rect x="13" y="3" width="8" height="8" rx="1"/><rect x="3" y="13" width="8" height="8" rx="1"/>
-<rect x="13" y="13" width="8" height="8" rx="1"/></svg></a>
-<a class="gallery-nav-link" href="/upload" aria-label="Upload" title="Upload">
-<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 16V4m0 0L7 9m5-5 5 5"/>
-<path d="M5 14v5a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-5"/></svg></a>
-</nav>${options.account || ''}</header>
+${sharedHeader}
 <h1>${title}</h1>
 ${body}
 </main>
 </body>
 </html>`
-}
-
-function accountActions() {
-    return `<div class="account-actions">
-<span class="profile-icon" aria-label="Profile"><svg viewBox="0 0 24 24" aria-hidden="true">
-<circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg></span>
-<a class="sign-out" href="/logout">Sign out</a>
-</div>`
 }
 
 function uploadAuthScript() {
@@ -476,7 +506,7 @@ export async function getUploadPage(req: FastifyRequest, res: FastifyReply) {
     const session = await getSessionDetails(req)
     const userId = session?.id || null
     if (session) setSessionCookies(req, res, session)
-    const account = session ? accountActions() : ''
+    const account = !!session
     const guestHint = userId ? '' : '<p id="upload-hint" class="upload-hint">Sign in to upload multiple files at once.</p>'
     const body = `<p class="intro">Upload images, videos or files.</p>
 <form id="upload" class="upload-panel">
@@ -525,7 +555,7 @@ export async function getLoginPage(req: FastifyRequest, res: FastifyReply) {
 export async function getGalleryPage(_req: FastifyRequest, res: FastifyReply) {
     const session = await getSessionDetails(_req)
     if (session) setSessionCookies(_req, res, session)
-    const account = session ? accountActions() : ''
+    const account = !!session
     const body = `<div id="photo-library" class="photo-library-layout" aria-busy="true">
 <aside id="photo-library-sidebar" class="library-sidebar" aria-label="Photo library">
 <div class="library-sidebar-content">
