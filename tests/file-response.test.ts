@@ -146,6 +146,25 @@ describe('Identity session checks', () => {
 })
 
 describe('standalone CDN pages', () => {
+    test('renders a working sidebar control and a Hanasand profile link for signed-in users', async () => {
+        const originalFetch = globalThis.fetch
+        globalThis.fetch = (async () => new Response(JSON.stringify({
+            id: 'user-1', token: 'session-token', expires_at: '2026-10-24T00:00:00.000Z',
+        }), { status: 200, headers: { 'Content-Type': 'application/json' } })) as typeof fetch
+
+        try {
+            const { html } = await page(getGalleryPage, {
+                headers: { host: 'cdn.hanasand.com', cookie: 'id=user-1; access_token=session-token' },
+                protocol: 'https', url: '/gallery', method: 'GET',
+            })
+            expect(html).toContain('id="library-sidebar-toggle"')
+            expect(html).toContain('href="https://hanasand.com/profile"')
+            expect(html).toContain('aria-label="Profile on Hanasand"')
+        } finally {
+            globalThis.fetch = originalFetch
+        }
+    })
+
     test('renders the guest state and picker fallback in the initial upload HTML', async () => {
         const { html } = await page(getUploadPage)
         const scripts = Array.from(html.matchAll(/<script>([\s\S]*?)<\/script>/g))
@@ -211,12 +230,17 @@ describe('standalone CDN pages', () => {
         expect(gallery).toContain('.cdn-header--hide-brand .hanasand-header__brand { display: none; }')
         expect(gallery).toContain('id="photo-library-sidebar"')
         expect(gallery).toContain('id="library-menu-toggle"')
+        expect(gallery).toContain('id="library-sidebar-toggle"')
         expect(gallery).toContain('id="selection-actions" class="selection-actions" hidden')
         expect(gallery).toContain('id="shared-albums-section" hidden')
         expect(gallery).toContain('#owned-albums-section:not(.has-owned-albums) > #owned-albums { display: none; }')
         expect(gallery).toContain('<div class="library-section" id="owned-albums-section">')
         expect(gallery).toContain('.library-sidebar.is-open')
-        expect(gallery).toContain('.gallery-page.sidebar-expanded .photo-library-layout')
+        expect(gallery).toContain('.photo-library-layout.sidebar-collapsed')
+        expect(gallery).toContain('.photo-library-layout.sidebar-expanded')
+        expect(gallery).not.toContain('.gallery-page.sidebar-collapsed .photo-library-layout')
+        expect(galleryClient).toContain('page.classList.toggle(\'sidebar-collapsed\'')
+        expect(galleryClient).toContain('librarySidebarToggle?.addEventListener(\'click\'')
         expect(gallery).toContain('(hover: none) and (pointer: coarse)')
         expect(gallery).toContain('id="photo-search"')
         expect(gallery).toContain('id="date-timeline"')
@@ -264,7 +288,7 @@ describe('standalone CDN pages', () => {
         expect(login).toContain('redirect-path="/gallery"')
         expect(login).toContain('input:focus, input:focus-visible {')
         expect(login).toContain('background-color: #080808; color: #f6f6f3; border-color: #707070;')
-        expect(login).toContain('input::selection { background: #303030; color: #f6f6f3; }')
+        expect(login).toContain('input::selection { background: #292929; color: #f6f6f3; }')
         expect(login).toContain('input:-webkit-autofill')
         expect(login).toContain('button:focus-visible, a:focus-visible, input:focus-visible')
         expect(login).toContain('outline: 2px solid #999;')

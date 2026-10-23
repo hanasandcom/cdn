@@ -22,6 +22,7 @@
     const selectionActions = document.querySelector('#selection-actions')
     const librarySidebar = document.querySelector('#photo-library-sidebar')
     const libraryMenuToggle = document.querySelector('#library-menu-toggle')
+    const librarySidebarToggle = document.querySelector('#library-sidebar-toggle')
     const publicToken = page.dataset.publicToken || ''
     const isPublic = Boolean(publicToken)
     const setGridDensity = value => {
@@ -35,7 +36,7 @@
     try { setGridDensity(localStorage.getItem('cdn-gallery-density') || defaultDensity) } catch { setGridDensity(defaultDensity) }
     densitySelect?.addEventListener('change', () => setGridDensity(densitySelect.value))
     const setSidebarOpen = open => {
-        if (!librarySidebar || !libraryMenuToggle) return
+        if (!librarySidebar) return
         const phone = window.matchMedia('(max-width: 48rem)').matches
         const tabletQuery = '(min-width: 48.001rem) and (max-width: 80rem), '
             + '(hover: none) and (pointer: coarse) and (min-width: 48.001rem)'
@@ -45,11 +46,18 @@
         librarySidebar.classList.toggle('is-open', phone && expanded)
         page.classList.toggle('sidebar-expanded', tablet && expanded)
         page.classList.toggle('sidebar-collapsed', desktop && !expanded)
-        libraryMenuToggle.setAttribute('aria-expanded', String(expanded))
-        const label = phone ? (expanded ? 'Close library navigation' : 'Browse library')
-            : (expanded ? 'Collapse sidebar' : 'Expand sidebar')
-        libraryMenuToggle.setAttribute('aria-label', label)
-        libraryMenuToggle.title = label
+        if (libraryMenuToggle) {
+            const label = expanded ? 'Close library navigation' : 'Browse library'
+            libraryMenuToggle.setAttribute('aria-expanded', String(phone && expanded))
+            libraryMenuToggle.setAttribute('aria-label', label)
+            libraryMenuToggle.title = label
+        }
+        if (librarySidebarToggle) {
+            const label = expanded ? 'Collapse sidebar' : 'Expand sidebar'
+            librarySidebarToggle.setAttribute('aria-expanded', String(expanded))
+            librarySidebarToggle.setAttribute('aria-label', label)
+            librarySidebarToggle.title = label
+        }
         if (desktop) {
             try { localStorage.setItem('cdn-gallery-sidebar-collapsed', String(!expanded)) } catch { /* Storage may be disabled. */ }
         }
@@ -61,11 +69,17 @@
     try { desktopSidebarOpen = localStorage.getItem('cdn-gallery-sidebar-collapsed') !== 'true' } catch { /* Storage may be disabled. */ }
     setSidebarOpen(!phoneViewport && !tabletViewport ? desktopSidebarOpen : false)
     window.addEventListener('resize', () => {
-        const open = libraryMenuToggle?.getAttribute('aria-expanded') === 'true'
+        const phone = window.matchMedia('(max-width: 48rem)').matches
+        const toggle = phone ? libraryMenuToggle : librarySidebarToggle
+        const open = toggle?.getAttribute('aria-expanded') === 'true'
         setSidebarOpen(open)
     })
     libraryMenuToggle?.addEventListener('click', () => {
         const open = libraryMenuToggle.getAttribute('aria-expanded') !== 'true'
+        setSidebarOpen(open)
+    })
+    librarySidebarToggle?.addEventListener('click', () => {
+        const open = librarySidebarToggle.getAttribute('aria-expanded') !== 'true'
         setSidebarOpen(open)
     })
     document.addEventListener('keydown', event => {

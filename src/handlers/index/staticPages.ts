@@ -110,7 +110,7 @@ input:focus-visible { outline-color: #707070; outline-offset: 2px; }
 .profile-icon {
     display: grid; width: 2.5rem; min-width: 2.5rem; height: 2.5rem; place-items: center;
     border: 1px solid #383838; border-radius: .65rem; background: #191919;
-    color: #eee; font-size: .85rem; font-weight: 700;
+    color: #eee; font-size: .85rem; font-weight: 700; text-decoration: none;
 }
 .profile-icon svg { width: 1.1rem; height: 1.1rem; fill: none; stroke: currentColor; stroke-width: 1.7; }
 .sign-out {
@@ -217,6 +217,12 @@ hanasand-upload-picker:defined > .picker-fallback { display: none; }
 }
 #library-menu-toggle:hover { background: #292929; }
 #library-menu-toggle svg { width: 1.2rem; height: 1.2rem; fill: none; stroke: currentColor; stroke-width: 1.8; }
+#library-sidebar-toggle {
+    display: inline-flex; min-width: 2.5rem; min-height: 2.5rem; align-items: center; justify-content: center;
+    border: 1px solid #383838; border-radius: .65rem; background: #191919; color: #eee; padding: .45rem;
+}
+#library-sidebar-toggle:hover { background: #292929; }
+#library-sidebar-toggle svg { width: 1.2rem; height: 1.2rem; fill: none; stroke: currentColor; stroke-width: 1.8; }
 .gallery-nav-link, .density-control {
     display: inline-flex; min-width: 2.5rem; min-height: 2.5rem; align-items: center;
     justify-content: center; gap: .45rem; border: 1px solid #383838; border-radius: .65rem;
@@ -230,27 +236,31 @@ hanasand-upload-picker:defined > .picker-fallback { display: none; }
 }
 .density-control:focus-within { outline: 2px solid #999; outline-offset: 2px; }
 .photo-library-layout { display: grid; grid-template-columns: 16rem minmax(0, 1fr); gap: 0; min-height: calc(100vh - 3.5rem); margin: 0; }
-.gallery-page.sidebar-collapsed .photo-library-layout { grid-template-columns: 4.25rem minmax(0, 1fr); }
-.gallery-page.sidebar-collapsed .library-sidebar { width: 4.25rem; padding: .85rem .45rem; overflow-x: hidden; }
-.gallery-page.sidebar-collapsed .library-section { justify-items: center; gap: .3rem; }
-.gallery-page.sidebar-collapsed .library-section h2,
-.gallery-page.sidebar-collapsed .library-nav-label,
-.gallery-page.sidebar-collapsed .album-nav .count { display: none; }
-.gallery-page.sidebar-collapsed .library-nav,
-.gallery-page.sidebar-collapsed .album-nav {
+.photo-library-layout.sidebar-collapsed { grid-template-columns: 4.25rem minmax(0, 1fr); }
+.photo-library-layout.sidebar-collapsed .library-sidebar { width: 4.25rem; padding: .85rem .45rem; overflow-x: hidden; }
+.photo-library-layout.sidebar-collapsed .library-sidebar-header { justify-content: center; }
+.photo-library-layout.sidebar-collapsed .library-sidebar-header h2,
+.photo-library-layout.sidebar-collapsed .library-section h2,
+.photo-library-layout.sidebar-collapsed .library-nav-label,
+.photo-library-layout.sidebar-collapsed .album-nav .count { display: none; }
+.photo-library-layout.sidebar-collapsed .library-section { justify-items: center; gap: .3rem; }
+.photo-library-layout.sidebar-collapsed .library-nav,
+.photo-library-layout.sidebar-collapsed .album-nav {
     width: 2.8rem; min-height: 2.8rem; justify-content: center; padding: .5rem; font-size: 1.1rem;
 }
-.gallery-page.sidebar-collapsed .library-nav span { font-size: 1.2rem; }
-.gallery-page.sidebar-collapsed .new-album {
+.photo-library-layout.sidebar-collapsed .library-nav span { font-size: 1.2rem; }
+.photo-library-layout.sidebar-collapsed .new-album {
     width: 2.8rem; height: 2.8rem; overflow: hidden; padding: .4rem; font-size: 0;
 }
-.gallery-page.sidebar-collapsed .new-album::before { content: '＋'; font-size: 1.2rem; }
+.photo-library-layout.sidebar-collapsed .new-album::before { content: '＋'; font-size: 1.2rem; }
 .public-library { grid-template-columns: minmax(0, 1fr); }
 .library-sidebar {
     position: sticky; top: 3.5rem; display: grid; height: calc(100vh - 3.5rem); overflow-y: auto;
     align-content: start; gap: 1.25rem; padding: 1.25rem .85rem;
     border-right: 1px solid #383838; background: #101010;
 }
+.library-sidebar-header { display: flex; align-items: center; justify-content: space-between; gap: .5rem; }
+.library-sidebar-header h2 { margin: 0; color: #999; font-size: .72rem; letter-spacing: .08em; text-transform: uppercase; }
 .library-section { display: grid; gap: .35rem; }
 #owned-albums-section:not(.has-owned-albums) > h2,
 #owned-albums-section:not(.has-owned-albums) > #owned-albums { display: none; }
@@ -387,6 +397,8 @@ hanasand-upload-picker:defined > .picker-fallback { display: none; }
         background: #101010; box-shadow: 0 1rem 2rem #0009;
     }
     .library-sidebar.is-open { display: grid; grid-template-columns: minmax(0, 1fr); }
+    .library-sidebar-header h2 { color: #999; }
+    #library-sidebar-toggle { display: none; }
     .library-sidebar-content { gap: .85rem; }
     .library-nav, .album-nav { padding: .5rem; }
     .library-content { padding: .85rem .8rem 2rem; }
@@ -406,9 +418,11 @@ hanasand-upload-picker:defined > .picker-fallback { display: none; }
 }
 @media (min-width: 48.001rem) and (max-width: 80rem),
     (hover: none) and (pointer: coarse) and (min-width: 48.001rem) {
-    #library-menu-toggle { display: inline-flex; align-items: center; justify-content: center; }
+    #library-menu-toggle { display: none; }
     .photo-library-layout { grid-template-columns: 4.25rem minmax(0, 1fr); }
     .library-sidebar { width: 4.25rem; padding: .85rem .45rem; overflow-x: hidden; }
+    .library-sidebar-header { justify-content: center; }
+    .library-sidebar-header h2 { display: none; }
     .library-sidebar-content { gap: 1rem; }
     .library-section { justify-items: center; gap: .3rem; }
     .library-section h2, .library-nav-label, .album-nav .count { display: none; }
@@ -416,7 +430,10 @@ hanasand-upload-picker:defined > .picker-fallback { display: none; }
     .library-nav span { font-size: 1.2rem; }
     .new-album { width: 2.8rem; height: 2.8rem; overflow: hidden; padding: .4rem; font-size: 0; }
     .new-album::before { content: '＋'; font-size: 1.2rem; }
-    .gallery-page.sidebar-expanded .photo-library-layout { grid-template-columns: 15rem minmax(0, 1fr); }
+    .photo-library-layout.sidebar-expanded { grid-template-columns: 15rem minmax(0, 1fr); }
+    .sidebar-expanded .library-sidebar-header { justify-content: space-between; }
+    .sidebar-expanded .library-sidebar-header h2 { display: block; }
+    .sidebar-expanded #library-sidebar-toggle { flex: 0 0 auto; }
     .sidebar-expanded .library-sidebar { width: 15rem; padding: 1rem .75rem; }
     .sidebar-expanded .library-section { justify-items: stretch; }
     .sidebar-expanded .library-section h2, .sidebar-expanded .library-nav-label,
@@ -425,6 +442,7 @@ hanasand-upload-picker:defined > .picker-fallback { display: none; }
     .sidebar-expanded .new-album { width: 100%; height: auto; font-size: .8rem; }
     .sidebar-expanded .new-album::before { content: none; }
 }
+@media (min-width: 48.001rem) { #library-menu-toggle { display: none; } }
 @media (hover: none) { .photo-select-indicator { opacity: 1; } }
 @media (min-width: 48rem) {
     .picker-fallback { grid-template-columns: minmax(0, 1.05fr) minmax(0, .95fr); }
@@ -444,7 +462,7 @@ function shell(title: string, body: string, options: {
     const libraryToggle = options.showLibraryToggle ? createElement('button', {
         id: 'library-menu-toggle', type: 'button', 'aria-controls': 'photo-library-sidebar',
         'aria-expanded': 'false', 'aria-label': 'Browse library', title: 'Browse library',
-    }, icon('M4 6h16M4 12h16M4 18h16')) : null
+    }, icon('M3 4h18v16H3z M9 4v16 M15 9l-3 3 3 3')) : null
     const galleryLink = createElement('a', {
         className: 'gallery-nav-link', href: '/gallery', 'aria-label': 'Gallery', title: 'Gallery',
     }, createElement('svg', { viewBox: '0 0 24 24', 'aria-hidden': 'true' },
@@ -457,10 +475,13 @@ function shell(title: string, body: string, options: {
     }, createElement('svg', { viewBox: '0 0 24 24', 'aria-hidden': 'true' },
         createElement('path', { d: 'M12 16V4m0 0L7 9m5-5 5 5M5 14v5a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-5' })))
     const accountActions = options.account ? createElement('div', { className: 'account-actions' },
-        createElement('span', { className: 'profile-icon', 'aria-label': 'Profile' },
-            createElement('svg', { viewBox: '0 0 24 24', 'aria-hidden': 'true' },
-                createElement('circle', { cx: '12', cy: '8', r: '4' }),
-                createElement('path', { d: 'M4 21a8 8 0 0 1 16 0' }))),
+        createElement('a', {
+            className: 'profile-icon', href: 'https://hanasand.com/profile',
+            'aria-label': 'Profile on Hanasand', title: 'Profile',
+        },
+        createElement('svg', { viewBox: '0 0 24 24', 'aria-hidden': 'true' },
+            createElement('circle', { cx: '12', cy: '8', r: '4' }),
+            createElement('path', { d: 'M4 21a8 8 0 0 1 16 0' }))),
         createElement('a', { className: 'sign-out', href: '/logout' }, 'Sign out')) : null
     const actions = createElement('div', { className: 'cdn-header-actions' }, libraryToggle, galleryLink, uploadLink, accountActions)
     const sharedHeader = renderToStaticMarkup(createElement(Header, {
@@ -577,8 +598,12 @@ export async function getGalleryPage(_req: FastifyRequest, res: FastifyReply) {
     const account = !!session
     const body = `<div id="photo-library" class="photo-library-layout" aria-busy="true">
 <aside id="photo-library-sidebar" class="library-sidebar" aria-label="Photo library">
+<div class="library-sidebar-header"><h2>Library</h2>
+<button id="library-sidebar-toggle" type="button" aria-controls="photo-library-sidebar"
+aria-expanded="true" aria-label="Collapse sidebar" title="Collapse sidebar">
+<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 4h18v16H3zM9 4v16m2-8h5m-2-2 2 2-2 2"/></svg></button></div>
 <div class="library-sidebar-content">
-<div class="library-section"><h2>Library</h2>
+<div class="library-section">
 <button class="library-nav" data-view="library" aria-current="page" aria-label="All photos" title="All photos">
 <span aria-hidden="true">▦</span><span class="library-nav-label">All photos</span></button>
 <button class="library-nav" data-view="recent" aria-label="Recent" title="Recent">
