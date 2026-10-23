@@ -208,6 +208,8 @@ hanasand-upload-picker:defined > .picker-fallback { display: none; }
     border-right: 1px solid #343436; background: #202023;
 }
 .library-section { display: grid; gap: .35rem; }
+.library-section:not(.has-owned-albums) > h2,
+.library-section:not(.has-owned-albums) > #owned-albums { display: none; }
 .library-sidebar-content { display: grid; align-content: start; gap: 1.25rem; }
 .library-section h2 { margin: 0 0 .25rem; color: #999; font-size: .72rem; letter-spacing: .08em; text-transform: uppercase; }
 .library-nav, .album-nav {

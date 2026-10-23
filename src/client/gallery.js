@@ -335,6 +335,10 @@
         shared.replaceChildren()
         const sharedSection = document.querySelector('#shared-albums-section')
         if (sharedSection) sharedSection.hidden = true
+        const ownedSection = owned.closest('.library-section')
+        ownedSection?.classList.toggle('has-owned-albums', state.albums.some(
+            album => album.owner === window.cdnAuthUser?.id,
+        ))
         albumTarget.replaceChildren(new Option('Add to album', ''))
         for (const album of state.albums) {
             const button = document.createElement('button')
