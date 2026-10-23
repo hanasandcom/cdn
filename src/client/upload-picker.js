@@ -185,6 +185,8 @@
     class HanasandUploadPicker extends HTMLElement {
         static observedAttributes = ['multiple', 'disabled']
         selectedFiles = []
+        uploadStates = new Map()
+        uploadElements = new WeakMap()
         page = 0
         objectUrls = []
 
@@ -229,6 +231,10 @@
                     .metadata-item svg { width: .9rem; height: .9rem; flex: none; stroke: currentColor; stroke-width: 1.75; fill: none; stroke-linecap: round; stroke-linejoin: round; }
                     .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; }
                     .remove-button { min-height: 2rem; padding: .4rem .55rem; font-size: .75rem; }
+                    .file-actions { display: grid; gap: .35rem; }
+                    .file-upload-state { overflow-wrap: anywhere; margin: .35rem 0 0; color: var(--ui-muted, #aaa); font-size: .72rem; }
+                    .file-upload-state.has-error { color: #ffb4ab; }
+                    .retry-button { min-height: 2rem; padding: .35rem .55rem; border: 1px solid var(--ui-border, #555); border-radius: .5rem; background: var(--ui-raised, #252527); color: var(--ui-text, #f6f6f3); font-size: .75rem; cursor: pointer; }
                     .extras, .actions { display: grid; gap: .75rem; }
                     @media (min-width: 48rem) { .panel { grid-template-columns: minmax(0, 1.05fr) minmax(0, .95fr); } .drop-side { min-height: 26.25rem; border-right: 1px solid var(--ui-border, #393939); border-bottom: 0; padding: 1.5rem; } .dropzone { min-height: 21rem; padding: 2rem; } .upload-side { gap: 1.25rem; padding: 1.5rem; } }
                 </style>
@@ -289,10 +295,17 @@
                 this.cameraInput.disabled = disabled
                 this.dropzone.tabIndex = disabled ? -1 : 0
                 this.dropzone.setAttribute('aria-disabled', String(disabled))
+                for (const button of this.shadowRoot.querySelectorAll('.retry-button')) button.disabled = disabled
             }
         }
 
         get files() { return this.selectedFiles.slice() }
+
+        setUploadState(file, state) {
+            this.uploadStates.set(file, state)
+            const elements = this.uploadElements.get(file)
+            if (elements) this.applyUploadState(elements, state, file)
+        }
 
         clear() {
             this.selectedFiles = []
@@ -346,6 +359,10 @@
                 const name = document.createElement('p')
                 const meta = document.createElement('p')
                 const remove = document.createElement('button')
+                const actions = document.createElement('div')
+                const uploadState = this.uploadStates.get(file)
+                const state = document.createElement('p')
+                const retry = document.createElement('button')
                 const previewable = /^image\/(jpeg|png|gif|webp|avif|heic|heif|tiff?)$/i.test(file.type)
                 row.className = 'item'
                 image.className = 'thumb'
@@ -361,9 +378,24 @@
                 remove.textContent = 'Remove'
                 remove.setAttribute('aria-label', `Remove ${file.name}`)
                 remove.addEventListener('click', () => this.removeFile(start + index))
+                actions.className = 'file-actions'
+                actions.append(remove)
                 details.append(name, meta)
-                row.append(image, details, remove)
+                state.className = 'file-upload-state'
+                state.hidden = true
+                retry.className = 'retry-button'
+                retry.type = 'button'
+                retry.textContent = 'Retry'
+                retry.hidden = true
+                retry.setAttribute('aria-label', `Retry ${file.name}`)
+                retry.addEventListener('click', () => this.dispatchEvent(new CustomEvent('retryfile', { detail: { file }, bubbles: true })))
+                actions.append(retry)
+                details.append(state)
+                const uploadElements = { state, retry }
+                this.uploadElements.set(file, uploadElements)
+                row.append(image, details, actions)
                 this.list.append(row)
+                if (uploadState) this.applyUploadState(uploadElements, uploadState, file)
                 readMetadata(file).then(({ date, location }) => {
                     if (!row.isConnected) return
                     const modified = file.lastModified ? new Date(file.lastModified) : null
@@ -373,6 +405,18 @@
                     if (location) meta.append(this.metadataItem('location', 'Location', location))
                 })
             })
+        }
+
+        applyUploadState(elements, uploadState, file) {
+            elements.state.hidden = false
+            elements.state.classList.toggle('has-error', Boolean(uploadState.error))
+            elements.state.textContent = uploadState.progress !== undefined
+                ? `${uploadState.label} · ${uploadState.progress}%`
+                : uploadState.label
+            if (uploadState.error) elements.state.textContent += ` · ${uploadState.error}`
+            elements.retry.hidden = !uploadState.error
+            elements.retry.disabled = this.hasAttribute('disabled')
+            elements.retry.setAttribute('aria-label', `Retry ${file.name}`)
         }
 
         metadataItem(iconName, label, value) {

@@ -13,6 +13,8 @@ test('normal restarts keep maintained totals without scanning the archive', asyn
     expect(statements.some(sql => sql.includes('WITH combined') || sql.includes('WITH live'))).toBe(false)
     expect(statements.some(sql => sql.includes('DELETE FROM request_metric_live_tps'))).toBe(true)
     expect(statements.some(sql => sql.includes('DROP INDEX'))).toBe(false)
+    expect(statements.some(sql => sql.includes('ALTER TABLE files ADD COLUMN IF NOT EXISTS upload_key TEXT'))).toBe(true)
+    expect(statements.some(sql => sql.includes('CREATE UNIQUE INDEX IF NOT EXISTS idx_files_owner_upload_key'))).toBe(true)
     expect(statements.some(sql => sql.includes('convalidated AND pg_get_constraintdef'))).toBe(true)
 })
 test('initial bootstrap still fills missing domain and live aggregates', async () => {

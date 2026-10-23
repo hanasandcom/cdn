@@ -13,6 +13,7 @@ import {
     getLoginPage,
     getUploadPage,
     getUploadPickerScript,
+    getBulkUploadScript,
     getSharedAlbumPage,
 } from './handlers/index/staticPages.ts'
 import login from './handlers/auth/login.ts'
@@ -85,6 +86,7 @@ fastify.get('/', getIndex)
 fastify.get('/upload', getUploadPage)
 fastify.get('/assets/exifreader.js', getExifReaderScript)
 fastify.get('/assets/upload-picker.js', getUploadPickerScript)
+fastify.get('/assets/bulk-upload.js', getBulkUploadScript)
 fastify.get('/assets/gallery.js', getGalleryClientScript)
 fastify.get('/gallery', getGalleryPage)
 fastify.get('/shared/:token', getSharedAlbumPage)

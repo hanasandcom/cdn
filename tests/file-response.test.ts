@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'bun:test'
 import {
     getExifReaderScript,
+    getBulkUploadScript,
     getGalleryClientScript,
     getGalleryPage,
     getLoginPage,
@@ -24,7 +25,10 @@ async function page(handler: typeof getUploadPage, request = {}) {
     return { html, headers }
 }
 
-async function script(handler: typeof getUploadPickerScript | typeof getGalleryClientScript | typeof getExifReaderScript) {
+type ScriptHandler = typeof getUploadPickerScript | typeof getBulkUploadScript
+    | typeof getGalleryClientScript | typeof getExifReaderScript
+
+async function script(handler: ScriptHandler) {
     let body = ''
     const reply = {
         header: () => reply,
@@ -130,15 +134,14 @@ describe('standalone CDN pages', () => {
         const { html } = await page(getUploadPage)
         const scripts = Array.from(html.matchAll(/<script>([\s\S]*?)<\/script>/g))
         const authScript = scripts[0]?.[1]
-        const uploadScript = scripts.at(-1)?.[1]
 
         expect(authScript).toContain('window.cdnAuth = fetch(\'/api/auth/session\'')
-        expect(uploadScript).toBeDefined()
-        expect(() => new Function(uploadScript!)).not.toThrow()
         expect(html).toContain('id="upload-hint" class="upload-hint">Sign in to upload multiple files at once.')
         expect(html).toContain('<div class="picker-fallback" aria-hidden="true">')
         expect(html).toContain('picker-fallback-dropzone')
         expect(html).toContain('/api/auth/session')
+        expect(html).toContain('/assets/bulk-upload.js')
+        expect(html).toContain('id="pause-upload"')
         expect(html).not.toContain('customElements.whenDefined')
         expect(html).not.toContain('hint.hidden')
     })
@@ -153,10 +156,6 @@ describe('standalone CDN pages', () => {
         const galleryClient = await script(getGalleryClientScript)
 
         const uploadScripts = Array.from(upload.matchAll(/<script>([\s\S]*?)<\/script>/g))
-        expect(uploadScripts.length).toBeGreaterThan(0)
-        expect(() => new Function(uploadScripts[uploadScripts.length - 1][1])).not.toThrow()
-        expect(() => new Function(uploadScripts.map(([, script]) => script).join('\n'))).not.toThrow()
-        expect(upload).toContain('fetch(\'/api/files\'')
         expect(upload).toContain('<hanasand-upload-picker id="picker"')
         expect(upload).not.toContain('<hanasand-upload-picker id="picker" multiple')
         expect(upload).toContain('<button class="upload-submit" type="submit" disabled>Upload</button>')
@@ -169,26 +168,23 @@ describe('standalone CDN pages', () => {
         expect(upload).not.toContain('hint.hidden')
         expect(upload).not.toContain('status.textContent = \'Sign-in could not be checked. Reload to try again.\'')
         expect(upload).not.toContain('Checking session')
-        const submitScript = uploadScripts[uploadScripts.length - 1][1]
-        expect(submitScript.indexOf('const auth = await window.cdnAuth')).toBeLessThan(
-            submitScript.indexOf('status.textContent = \'Preparing upload…\''),
-        )
-        expect(submitScript).toContain('picker.addEventListener(\'fileschange\', syncUploadButton)')
-        expect(submitScript).toContain('!(picker.files && picker.files.length)')
         expect(uploadScripts[0][1]).toContain('authPicker.setAttribute(\'multiple\', \'\')')
         expect(uploadScripts[0][1]).toContain('authPicker.removeAttribute(\'multiple\')')
         expect(upload).toContain('/assets/exifreader.js')
         expect(upload).toContain('/assets/upload-picker.js')
-        expect(upload).toContain('const files = picker.files')
-        expect(upload).toContain('fetch(\'/api/files/bulk\'')
-        expect(upload).toContain('X-CDN-Upload-Count')
-        expect(upload).toContain('if (response.status === 401) return login()')
-        expect(upload).toContain('if (!auth) {')
-        expect(upload).toContain('await wait(1000)')
-        expect(upload).toContain('const batch = files.slice(start, end)')
-        expect(upload).toContain('for (const file of batch) data.append(\'files\', file, file.name)')
-        expect(upload).toContain('const fileUrl = id => \'/api/files/\' + encodeURIComponent(id)')
-        expect(upload).not.toContain('link.href = \'/files/\'')
+        expect(upload).toContain('/assets/bulk-upload.js')
+        const uploadClient = await script(getBulkUploadScript)
+        expect(() => new Function(uploadClient)).not.toThrow()
+        expect(uploadClient).toContain('indexedDB.open(dbName, 1)')
+        expect(uploadClient).toContain('Select the original files to resume this import')
+        expect(uploadClient).toContain('X-CDN-Upload-Count')
+        expect(uploadClient).toContain('X-CDN-Upload-Key')
+        expect(uploadClient).toContain('xhr.upload.onprogress')
+        expect(uploadClient).toContain('picker.addEventListener(\'retryfile\'')
+        expect(uploadClient).toContain('activeRequest?.abort()')
+        expect(uploadClient).toContain('crypto.randomUUID()')
+        expect(uploadClient).toContain('data.append(`files:${item.key}`')
+        expect(uploadClient).toContain('credentials: \'same-origin\'')
         expect(gallery).toContain('id="photo-library"')
         expect(gallery).toContain('id="photo-library-sidebar"')
         expect(gallery).toContain('id="library-menu-toggle"')

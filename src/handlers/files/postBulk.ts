@@ -7,6 +7,7 @@ import { persistFile, maxFileBytes, StorageError } from '#utils/fileStorage.ts'
 import { beginUpload, maxBulkBytes, maxBulkFiles } from '#utils/uploadGuard.ts'
 import { readPhotoMetadata } from '#utils/photoMetadata.ts'
 import { createPhotoThumbnail } from '#utils/photoThumbnail.ts'
+import { findUploadedKey, isUploadKey } from '#utils/uploadIdempotency.ts'
 
 type BulkUploadHeaders = { 'x-cdn-upload-count'?: string }
 
@@ -33,8 +34,8 @@ export default async function postBulkFiles(
     }
 
     let finish: (() => void) | undefined
-    const uploaded: { id: string, name: string, url: string }[] = []
-    const failed: { name: string, error: string }[] = []
+    const uploaded: { id: string, name: string, url: string, uploadKey?: string }[] = []
+    const failed: { name: string, error: string, uploadKey?: string }[] = []
     let received = 0
     let stopReason = ''
     let totalBytes = 0
@@ -46,39 +47,55 @@ export default async function postBulkFiles(
         })) {
             received++
             const safeName = basename(part.filename.replaceAll('\\', '/'))
+            const uploadKey = part.fieldname.startsWith('files:') ? part.fieldname.slice(6) : undefined
             if (received > fileCount) {
                 part.file.resume()
-                failed.push({ name: safeName, error: 'The request contains more files than declared.' })
+                failed.push({
+                    name: safeName, error: 'The request contains more files than declared.',
+                    ...(isUploadKey(uploadKey) ? { uploadKey } : {}),
+                })
                 continue
             }
-            if (part.fieldname !== 'files' || !safeName || safeName.length > 255 || /[\r\n\0]/.test(safeName)) {
+            const validField = part.fieldname === 'files' || isUploadKey(uploadKey)
+            if (!validField || !safeName || safeName.length > 255 || /[\r\n\0]/.test(safeName)) {
                 part.file.resume()
-                failed.push({ name: safeName || 'Unnamed file', error: 'Invalid file name.' })
+                failed.push({
+                    name: safeName || 'Unnamed file', error: 'Invalid file name.',
+                    ...(isUploadKey(uploadKey) ? { uploadKey } : {}),
+                })
                 continue
             }
             if (stopReason) {
                 part.file.resume()
-                failed.push({ name: safeName, error: stopReason })
+                failed.push({ name: safeName, error: stopReason, ...(uploadKey ? { uploadKey } : {}) })
                 continue
             }
             const type = part.mimetype || 'application/octet-stream'
             if (type.length > 120 || !/^[\w.+-]+\/[\w.+-]+(?:\s*;\s*[\w=.+-]+)*$/.test(type)) {
                 part.file.resume()
-                failed.push({ name: safeName, error: 'Invalid file type.' })
+                failed.push({ name: safeName, error: 'Invalid file type.', ...(uploadKey ? { uploadKey } : {}) })
                 continue
             }
             try {
                 const data = await part.toBuffer()
                 if (part.file.truncated) {
-                    failed.push({ name: safeName, error: 'Files must be 50 MiB or smaller.' })
+                    failed.push({ name: safeName, error: 'Files must be 50 MiB or smaller.', ...(uploadKey ? { uploadKey } : {}) })
                     continue
                 }
                 if (totalBytes + data.length > maxBulkBytes) {
                     stopReason = 'Each bulk request must stay within 45 MiB.'
-                    failed.push({ name: safeName, error: stopReason })
+                    failed.push({ name: safeName, error: stopReason, ...(uploadKey ? { uploadKey } : {}) })
                     continue
                 }
                 totalBytes += data.length
+                if (uploadKey) {
+                    const existing = await findUploadedKey(userId, uploadKey)
+                    if (existing) {
+                        const url = `/api/files/${encodeURIComponent(existing.id)}`
+                        uploaded.push({ id: existing.id, name: existing.name, url, uploadKey })
+                        continue
+                    }
+                }
                 const id = randomUUID()
                 const metadata = readPhotoMetadata(data, type)
                 const thumbnail = await createPhotoThumbnail(data, type)
@@ -86,22 +103,30 @@ export default async function postBulkFiles(
                     await client.query(`INSERT INTO files
                         (id,name,description,data,path,type,owner,storage_key,storage_size,
                          thumbnail_storage_key,thumbnail_size,thumbnail_processed,
-                         photo_taken_at,photo_taken_offset_minutes,location_label,latitude,longitude)
-                        VALUES ($1,$2,NULL,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)`,
+                         photo_taken_at,photo_taken_offset_minutes,location_label,latitude,longitude,upload_key)
+                        VALUES ($1,$2,NULL,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17)`,
                     [id, safeName, Buffer.alloc(0), id, type, userId, key, data.length,
                         thumbnailKey || null, thumbnailSize || null, true,
                         metadata.photoTakenAt, metadata.photoTakenOffsetMinutes, metadata.locationLabel,
-                        metadata.latitude, metadata.longitude])
+                        metadata.latitude, metadata.longitude, uploadKey || null])
                 }, undefined, thumbnail)
-                uploaded.push({ id, name: safeName, url: `/api/files/${encodeURIComponent(id)}` })
+                uploaded.push({ id, name: safeName, url: `/api/files/${encodeURIComponent(id)}`, ...(uploadKey ? { uploadKey } : {}) })
             } catch (error) {
                 const e = error as Error & { statusCode?: number, code?: string }
+                if (uploadKey && e.code === '23505') {
+                    const existing = await findUploadedKey(userId, uploadKey)
+                    if (existing) {
+                        const url = `/api/files/${encodeURIComponent(existing.id)}`
+                        uploaded.push({ id: existing.id, name: existing.name, url, uploadKey })
+                        continue
+                    }
+                }
                 if (error instanceof StorageError) {
-                    failed.push({ name: safeName, error: e.message })
+                    failed.push({ name: safeName, error: e.message, ...(uploadKey ? { uploadKey } : {}) })
                     if (e.statusCode === 413 || e.statusCode === 507) stopReason = e.message
                 } else {
                     req.log.error({ error, userId }, 'Bulk upload file failed')
-                    failed.push({ name: safeName, error: 'Upload failed.' })
+                    failed.push({ name: safeName, error: 'Upload failed.', ...(uploadKey ? { uploadKey } : {}) })
                 }
             }
         }

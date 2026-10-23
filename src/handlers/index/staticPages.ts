@@ -5,6 +5,7 @@ import { getSessionDetails, setSessionCookies } from '#utils/auth/session.ts'
 import { safeCdnReturnPath } from '#utils/auth/safeCdnReturnPath.ts'
 
 const uploadPickerPath = new URL('../../client/upload-picker.js', import.meta.url)
+const bulkUploadPath = new URL('../../client/bulk-upload.js', import.meta.url)
 const galleryClientPath = new URL('../../client/gallery.js', import.meta.url)
 const exifReaderPath = new URL('../../../node_modules/exifreader/dist/exif-reader.js', import.meta.url)
 const authClientScriptPath = new URL('../../../dist/client/auth.js', import.meta.url)
@@ -12,6 +13,10 @@ const authClientStylesheetPath = new URL('../../../dist/client/auth.css', import
 export async function getUploadPickerScript(_req: FastifyRequest, res: FastifyReply) {
     const script = await readFile(uploadPickerPath)
     return res.header('Cache-Control', 'no-store').type('text/javascript').send(script)
+}
+
+export async function getBulkUploadScript(_req: FastifyRequest, res: FastifyReply) {
+    return res.header('Cache-Control', 'no-store').type('text/javascript').send(await readFile(bulkUploadPath))
 }
 
 export async function getExifReaderScript(_req: FastifyRequest, res: FastifyReply) {
@@ -106,6 +111,8 @@ input:focus-visible { outline-color: #707070; outline-offset: 2px; }
 .upload-status { overflow-wrap: anywhere; }
 .upload-status img { margin-top: .75rem; border-radius: .5rem; }
 .upload-hint { margin: 0; font-size: .75rem; }
+.upload-control { min-height: 2.5rem; border: 1px solid #393939; background: #202020; color: #f6f6f3; }
+.upload-progress { min-height: 1.5rem; margin: 0; color: #aaa; font-size: .875rem; }
 hanasand-upload-picker { display: block; }
 .picker-fallback {
     display: grid; overflow: hidden; grid-template-columns: minmax(0, 1fr);
@@ -489,190 +496,15 @@ export async function getUploadPage(req: FastifyRequest, res: FastifyReply) {
 <div class="upload-actions">
 ${guestHint}
 <button class="upload-submit" type="submit" disabled>Upload</button>
+<button id="pause-upload" class="upload-control" type="button" hidden>Pause</button>
 </div>
 </form>
-<p id="status" class="upload-status" role="status" aria-live="polite"></p>
+<p id="status" class="upload-progress" role="status" aria-live="polite"></p>
 <script defer src="/assets/exifreader.js"></script>
 <script defer src="/assets/upload-picker.js"></script>
+<script defer src="/assets/bulk-upload.js"></script>
 ${uploadAuthScript()}
-<script>
-const form = document.querySelector('#upload')
-const picker = document.querySelector('#picker')
-const status = document.querySelector('#status')
-const button = form.querySelector('.upload-submit')
-let uploadInProgress = false
-const syncUploadButton = () => { button.disabled = uploadInProgress || !(picker.files && picker.files.length) }
-picker.addEventListener('fileschange', syncUploadButton)
-syncUploadButton()
-const wait = ms => new Promise(resolve => setTimeout(resolve, ms))
-const addLink = (parent, url, text) => {
-    const link = document.createElement('a')
-    link.href = url
-    link.textContent = text
-    parent.append(link)
-}
-form.addEventListener('submit', async event => {
-    event.preventDefault()
-    const files = picker.files || []
-    if (!files.length || uploadInProgress) return
-    uploadInProgress = true
-    picker.setAttribute('disabled', '')
-    syncUploadButton()
-    try {
-        const auth = await window.cdnAuth
-        status.textContent = 'Preparing upload…'
-        if (!auth) {
-            const links = []
-            for (let i = 0; i < files.length; i++) {
-                const file = files[i]
-                status.textContent = 'Uploading ' + (i + 1) + ' of ' + files.length + ' files…'
-                const data = new FormData()
-                data.set('file', file)
-                data.set('name', file.name)
-                data.set('type', file.type || 'application/octet-stream')
-                while (true) {
-                    const response = await fetch('/api/files', { method: 'POST', body: data, credentials: 'same-origin' })
-                    if (response.status === 429) {
-                        const delay = Math.max(1, Number(response.headers.get('Retry-After')) || 1)
-                        await wait(delay * 1000)
-                        continue
-                    }
-                    const result = await response.json()
-                    if (!response.ok) throw Error(result.error || 'Upload failed.')
-                    const url = fileUrl(result.id)
-                    links.push({ url, name: file.name, type: file.type })
-                    break
-                }
-                if (i < files.length - 1) await wait(1000)
-            }
-            status.replaceChildren()
-            for (const item of links) {
-                const row = document.createElement('p')
-                addLink(row, item.url, item.name + ' · ' + location.origin + item.url)
-                if (/^image[/](jpeg|png|gif|webp|avif)$/i.test(item.type)) {
-                    const preview = document.createElement('img')
-                    preview.className = 'preview'
-                    preview.src = item.url
-                    preview.alt = item.name
-                    row.append(preview)
-                }
-                status.append(row)
-            }
-            return
-        }
-        if (files.length === 1) {
-            const file = files[0]
-            const data = new FormData()
-            data.set('file', file)
-            data.set('name', file.name)
-            data.set('type', file.type || 'application/octet-stream')
-            const response = await fetch('/api/files', { method: 'POST', body: data, credentials: 'same-origin' })
-            if (response.status === 401) return login()
-            const result = await response.json()
-            if (!response.ok) throw Error(result.error || 'Upload failed.')
-            status.textContent = 'Uploaded: '
-            const url = fileUrl(result.id)
-            addLink(status, url, location.origin + url)
-            if (/^image[/](jpeg|png|gif|webp|avif)$/i.test(file.type)) {
-                const preview = document.createElement('img')
-                preview.className = 'preview'
-                preview.src = url
-                preview.alt = file.name
-                status.append(preview)
-            }
-            return
-        }
-
-        const uploaded = []
-        const failed = []
-        let start = 0
-        while (start < files.length) {
-            let end = start
-            let batchBytes = 0
-            while (end < files.length && end - start < 5000 && batchBytes + files[end].size <= 45 * 1024 * 1024) {
-                batchBytes += files[end].size
-                end++
-            }
-            if (end === start) {
-                const file = files[start]
-                status.textContent = 'Uploading ' + (start + 1) + ' of ' + files.length + ' files…'
-                const data = new FormData()
-                data.set('file', file)
-                data.set('name', file.name)
-                data.set('type', file.type || 'application/octet-stream')
-                while (true) {
-                    const response = await fetch('/api/files', { method: 'POST', body: data, credentials: 'same-origin' })
-                    if (response.status === 401) return login()
-                    if (response.status === 429) {
-                        const delay = Math.max(1, Number(response.headers.get('Retry-After')) || 1)
-                        await wait(delay * 1000)
-                        continue
-                    }
-                    const result = await response.json()
-                    if (!response.ok) throw Error(result.error || 'Upload failed.')
-                    uploaded.push({ id: result.id, name: file.name })
-                    break
-                }
-                start++
-                continue
-            }
-            const batch = files.slice(start, end)
-            let result
-            while (true) {
-                status.textContent = 'Uploading ' + (start + 1) + ' of ' + files.length + ' files…'
-                const data = new FormData()
-                for (const file of batch) data.append('files', file, file.name)
-                const response = await fetch('/api/files/bulk', {
-                    method: 'POST',
-                    headers: { 'X-CDN-Upload-Count': String(batch.length) },
-                    body: data,
-                    credentials: 'same-origin',
-                })
-                if (response.status === 401) return login()
-                if (response.status === 429) {
-                    const delay = Math.max(1, Number(response.headers.get('Retry-After')) || 1)
-                    await wait(delay * 1000)
-                    continue
-                }
-                result = await response.json()
-                if (!response.ok) throw Error(result.error || 'Bulk upload failed.')
-                break
-            }
-            uploaded.push(...result.uploaded)
-            failed.push(...result.failed)
-            start = end
-            status.textContent = 'Uploaded ' + uploaded.length + ' of ' + files.length + ' files…'
-        }
-        status.replaceChildren()
-        const summary = document.createElement('p')
-        summary.textContent = uploaded.length + ' uploaded, ' + failed.length + ' failed.'
-        const gallery = document.createElement('a')
-        gallery.href = '/gallery'
-        gallery.textContent = 'Open gallery'
-        status.append(summary, gallery)
-        if (failed.length) {
-            const list = document.createElement('ul')
-            for (const item of failed.slice(0, 20)) {
-                const row = document.createElement('li')
-                row.textContent = item.name + ': ' + item.error
-                list.append(row)
-            }
-            status.append(list)
-            if (failed.length > 20) {
-                const more = document.createElement('p')
-                more.textContent = 'Showing 20 of ' + failed.length + ' errors.'
-                status.append(more)
-            }
-        }
-    } catch (error) {
-        status.textContent = error.message || 'Upload failed.'
-    } finally {
-        uploadInProgress = false
-        picker.removeAttribute('disabled')
-        syncUploadButton()
-    }
-})
-</script>`
+`
     return res.header('Cache-Control', 'private, no-store').type('text/html').send(shell('Upload media', body, { account }))
 }
 

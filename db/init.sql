@@ -27,12 +27,16 @@ CREATE TABLE IF NOT EXISTS files (
     data BYTEA NOT NULL,
     type TEXT NOT NULL,
     owner TEXT,
+    upload_key TEXT,
     path TEXT UNIQUE NOT NULL,
     uploaded_at TIMESTAMPTZ DEFAULT NOW()
 );
 
 CREATE INDEX IF NOT EXISTS idx_files_owner_uploaded_at
 ON files(owner, uploaded_at DESC);
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_files_owner_upload_key
+ON files(owner, upload_key) WHERE upload_key IS NOT NULL;
 
 -- Shares
 CREATE TABLE IF NOT EXISTS shares (

@@ -6,14 +6,19 @@ import { beginGuestUpload, beginUpload } from '#utils/uploadGuard.ts'
 import { getSessionUserId } from '#utils/auth/session.ts'
 import { readPhotoMetadata } from '#utils/photoMetadata.ts'
 import { createPhotoThumbnail } from '#utils/photoThumbnail.ts'
+import { findUploadedKey, isUploadKey } from '#utils/uploadIdempotency.ts'
 
-export default async function postFile(req: FastifyRequest, res: FastifyReply) {
+type UploadHeaders = { 'x-cdn-upload-key'?: string }
+
+export default async function postFile(req: FastifyRequest<{ Headers: UploadHeaders }>, res: FastifyReply) {
     const user = typeof req.headers.id === 'string' ? req.headers.id : ''
     const token = req.headers.authorization?.split(' ')[1] || ''
     const userId = user && token
         ? (await tokenWrapper(user, token, req)).id
         : await getSessionUserId(req)
     if (!req.isMultipart()) return res.status(400).send({ error: 'Request is not multipart' })
+    const uploadKey = req.headers['x-cdn-upload-key']
+    if (uploadKey && (!userId || !isUploadKey(uploadKey))) return res.status(400).send({ error: 'Invalid upload key.' })
     let finish: (() => void) | undefined
     let owner = userId || ''
     try {
@@ -39,6 +44,10 @@ export default async function postFile(req: FastifyRequest, res: FastifyReply) {
         if (type.length > 120 || !/^[\w.+-]+\/[\w.+-]+(?:\s*;\s*[\w=.+-]+)*$/.test(type)) {
             return res.status(400).send({ error: 'Invalid file type.' })
         }
+        if (uploadKey) {
+            const existing = await findUploadedKey(owner, uploadKey)
+            if (existing) return res.send({ id: existing.id, path: existing.id, owner: userId, uploadKey })
+        }
         const id = randomUUID()
         const path = userId ? fields.path || id : id
         const metadata = readPhotoMetadata(data, type)
@@ -46,17 +55,23 @@ export default async function postFile(req: FastifyRequest, res: FastifyReply) {
         await persistFile(owner, data, async (client, key, thumbnailKey, thumbnailSize) => {
             await client.query(`INSERT INTO files
                 (id,name,description,data,path,type,owner,storage_key,storage_size,thumbnail_storage_key,thumbnail_size,thumbnail_processed,
-                 photo_taken_at,photo_taken_offset_minutes,location_label,latitude,longitude)
-                VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17)`,
+                 photo_taken_at,photo_taken_offset_minutes,location_label,latitude,longitude,upload_key)
+                VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18)`,
             [id, fields.name, fields.description || null, Buffer.alloc(0), path, type, owner, key, data!.length,
                 thumbnailKey || null, thumbnailSize || null, true,
                 metadata.photoTakenAt, metadata.photoTakenOffsetMinutes, metadata.locationLabel,
-                metadata.latitude, metadata.longitude])
+                metadata.latitude, metadata.longitude, uploadKey || null])
         }, undefined, thumbnail)
-        return res.send({ id, path, owner: userId || null })
+        return res.send({ id, path, owner: userId || null, ...(uploadKey ? { uploadKey } : {}) })
     } catch (error) {
         const e = error as Error & { statusCode?: number, code?: string }
-        if (e.code === '23505') return res.status(409).send({ error: 'That file path is already taken.' })
+        if (e.code === '23505') {
+            if (uploadKey) {
+                const existing = await findUploadedKey(owner, uploadKey)
+                if (existing) return res.send({ id: existing.id, path: existing.id, owner: userId, uploadKey })
+            }
+            return res.status(409).send({ error: 'That file path is already taken.' })
+        }
         if (error instanceof StorageError && error.statusCode === 429) {
             return res.header('Retry-After', '1').status(error.statusCode).send({ error: error.message })
         }

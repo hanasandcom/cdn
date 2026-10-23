@@ -14,16 +14,23 @@ import deleteFile from '../src/handlers/files/delete.ts'
 const app = Fastify()
 const originalFetch = globalThis.fetch
 beforeAll(async () => {
-    if (process.env.DB_HOST !== 'cdn-restore-test-db') throw new Error('Tests require the isolated database.')
+    const localDatabase = process.env.CDN_TEST_ISOLATED === '1'
+        && process.env.DB === 'cdn_upload_test'
+        && process.env.DB_USER === 'cdn_test'
+        && ['127.0.0.1', 'localhost'].includes(process.env.DB_HOST || '')
+    if (process.env.DB_HOST !== 'cdn-restore-test-db' && !localDatabase) {
+        throw new Error('Tests require the isolated database.')
+    }
     await prepareStorage()
     await pool.query('DROP TABLE IF EXISTS files')
     await pool.query(`CREATE TABLE files(
         id TEXT PRIMARY KEY,name TEXT,description TEXT,data BYTEA NOT NULL,path TEXT UNIQUE,type TEXT,owner TEXT,
-        uploaded_at TIMESTAMPTZ DEFAULT NOW(),storage_key TEXT,storage_size BIGINT,
+        uploaded_at TIMESTAMPTZ DEFAULT NOW(),upload_key TEXT,storage_key TEXT,storage_size BIGINT,
         thumbnail_storage_key TEXT,thumbnail_size BIGINT,thumbnail_processed BOOLEAN DEFAULT FALSE,
         photo_taken_at TIMESTAMPTZ,photo_taken_offset_minutes SMALLINT,location_label TEXT,
         latitude DOUBLE PRECISION,longitude DOUBLE PRECISION,is_favorite BOOLEAN DEFAULT FALSE
     )`)
+    await pool.query('CREATE UNIQUE INDEX idx_test_files_owner_upload_key ON files(owner,upload_key) WHERE upload_key IS NOT NULL')
     await pool.query(`CREATE TABLE photo_albums(
         id TEXT PRIMARY KEY,owner TEXT NOT NULL,name TEXT NOT NULL,public_token TEXT UNIQUE,
         created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
@@ -48,17 +55,24 @@ beforeAll(async () => {
     await app.ready()
 })
 afterAll(async () => { globalThis.fetch = originalFetch; await app.close(); await pool.end() })
-function upload(body: string, path: string, auth = true, token = 'valid') {
+function upload(body: string, path: string, auth = true, token = 'valid', uploadKey?: string) {
     const boundary = 'cdn-boundary'
     const fields = { name: 'test.txt', type: 'text/plain', path }
     let payload = Object.entries(fields).map(([key,value]) => `--${boundary}\r\nContent-Disposition: form-data; name="${key}"\r\n\r\n${value}\r\n`).join('')
     payload += `--${boundary}\r\nContent-Disposition: form-data; name="file"; filename="test.txt"\r\nContent-Type: text/plain\r\n\r\n${body}\r\n--${boundary}--\r\n`
-    return app.inject({method:'POST',url:'/files',payload,headers:{'content-type':`multipart/form-data; boundary=${boundary}`,...(auth ? {id:'owner',authorization:`Bearer ${token}`} : {})}})
+    return app.inject({
+        method: 'POST', url: '/files', payload,
+        headers: {
+            'content-type': `multipart/form-data; boundary=${boundary}`,
+            ...(auth ? { id: 'owner', authorization: `Bearer ${token}` } : {}),
+            ...(uploadKey ? { 'x-cdn-upload-key': uploadKey } : {}),
+        },
+    })
 }
-function bulkUpload(files: { name: string, body: string }[], auth = true) {
+function bulkUpload(files: { name: string, body: string, key?: string }[], auth = true) {
     const boundary = 'cdn-bulk-boundary'
-    const payload = files.map(({ name, body }) =>
-        `--${boundary}\r\nContent-Disposition: form-data; name="files"; filename="${name}"\r\nContent-Type: image/jpeg\r\n\r\n${body}\r\n`,
+    const payload = files.map(({ name, body, key }) =>
+        `--${boundary}\r\nContent-Disposition: form-data; name="${key ? `files:${key}` : 'files'}"; filename="${name}"\r\nContent-Type: image/jpeg\r\n\r\n${body}\r\n`,
     ).join('') + `--${boundary}--\r\n`
     return app.inject({
         method: 'POST', url: '/files/bulk', payload,
@@ -106,6 +120,19 @@ test('path collision cleans its disk write without replacing the original', asyn
     expect((await upload('overwrite', 'roundtrip', true, 'other')).statusCode).toBe(409)
     expect((await readdir(storageDirectory)).length).toBe(count)
 })
+test('standard upload retries return the existing file after the rate window', async () => {
+    const key = '073f7796-a7db-4a5b-9619-cc7ba218577c'
+    await Bun.sleep(1100)
+    const first = await upload('retry contents', 'standard-retry', true, 'valid', key)
+    const throttled = await upload('retry contents', 'standard-retry-again', true, 'valid', key)
+    expect(first.statusCode).toBe(200)
+    expect(throttled.statusCode).toBe(429)
+    await Bun.sleep(1100)
+    const retried = await upload('retry contents', 'standard-retry-again', true, 'valid', key)
+    expect(retried.statusCode).toBe(200)
+    expect(retried.json().id).toBe(first.json().id)
+    expect((await pool.query('SELECT count(*) FROM files WHERE owner=$1 AND upload_key=$2', ['owner', key])).rows[0].count).toBe('1')
+})
 test('bulk upload stores multiple files and returns canonical share URLs', async () => {
     const response = await bulkUpload([
         { name: 'one.jpg', body: 'first image' },
@@ -118,6 +145,16 @@ test('bulk upload stores multiple files and returns canonical share URLs', async
     expect(result.uploaded[0].url).toBe('/api/files/' + result.uploaded[0].id)
     expect(result.uploaded[1].url).toBe('/api/files/' + result.uploaded[1].id)
     expect((await app.inject('/files/' + result.uploaded[0].id)).body).toBe('first image')
+})
+test('bulk retry with the same per-file upload key returns the existing file', async () => {
+    const key = 'ba1d8db6-9397-4d3e-b40a-041fc87469bf'
+    const first = await bulkUpload([{ name: 'retry.jpg', body: 'image contents', key }])
+    const second = await bulkUpload([{ name: 'retry.jpg', body: 'image contents', key }])
+    expect(first.statusCode).toBe(200)
+    expect(second.statusCode).toBe(200)
+    expect(second.json().uploaded[0].id).toBe(first.json().uploaded[0].id)
+    expect(second.json().uploaded[0].uploadKey).toBe(key)
+    expect((await pool.query('SELECT count(*) FROM files WHERE owner=$1 AND upload_key=$2', ['owner', key])).rows[0].count).toBe('1')
 })
 test('bulk upload rejects signed-out visitors before storing data', async () => {
     const response = await bulkUpload([{ name: 'guest.jpg', body: 'guest image' }, { name: 'other.jpg', body: 'other image' }], false)

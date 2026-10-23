@@ -54,6 +54,7 @@ export default async function ensureSchema() {
 
         await client.query(`
             ALTER TABLE files ADD COLUMN IF NOT EXISTS owner TEXT;
+            ALTER TABLE files ADD COLUMN IF NOT EXISTS upload_key TEXT;
             ALTER TABLE files ADD COLUMN IF NOT EXISTS storage_key TEXT;
             ALTER TABLE files ADD COLUMN IF NOT EXISTS storage_size BIGINT;
             ALTER TABLE files ADD COLUMN IF NOT EXISTS thumbnail_storage_key TEXT;
@@ -102,6 +103,9 @@ export default async function ensureSchema() {
 
             CREATE INDEX IF NOT EXISTS idx_files_owner_uploaded_at
             ON files(owner, uploaded_at DESC);
+
+            CREATE UNIQUE INDEX IF NOT EXISTS idx_files_owner_upload_key
+            ON files(owner, upload_key) WHERE upload_key IS NOT NULL;
 
             CREATE UNIQUE INDEX IF NOT EXISTS idx_request_logs_identity
             ON request_logs(domain, ip, user_agent, path);
