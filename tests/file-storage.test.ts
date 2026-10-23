@@ -17,7 +17,27 @@ beforeAll(async () => {
     if (process.env.DB_HOST !== 'cdn-restore-test-db') throw new Error('Tests require the isolated database.')
     await prepareStorage()
     await pool.query('DROP TABLE IF EXISTS files')
-    await pool.query('CREATE TABLE files(id TEXT PRIMARY KEY,name TEXT,description TEXT,data BYTEA NOT NULL,path TEXT UNIQUE,type TEXT,owner TEXT,uploaded_at TIMESTAMPTZ DEFAULT NOW(),storage_key TEXT,storage_size BIGINT)')
+    await pool.query(`CREATE TABLE files(
+        id TEXT PRIMARY KEY,name TEXT,description TEXT,data BYTEA NOT NULL,path TEXT UNIQUE,type TEXT,owner TEXT,
+        uploaded_at TIMESTAMPTZ DEFAULT NOW(),storage_key TEXT,storage_size BIGINT,
+        thumbnail_storage_key TEXT,thumbnail_size BIGINT,thumbnail_processed BOOLEAN DEFAULT FALSE,
+        photo_taken_at TIMESTAMPTZ,photo_taken_offset_minutes SMALLINT,location_label TEXT,
+        latitude DOUBLE PRECISION,longitude DOUBLE PRECISION,is_favorite BOOLEAN DEFAULT FALSE
+    )`)
+    await pool.query(`CREATE TABLE photo_albums(
+        id TEXT PRIMARY KEY,owner TEXT NOT NULL,name TEXT NOT NULL,public_token TEXT UNIQUE,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )`)
+    await pool.query(`CREATE TABLE photo_album_members(
+        album_id TEXT NOT NULL REFERENCES photo_albums(id) ON DELETE CASCADE,
+        user_id TEXT NOT NULL,role TEXT NOT NULL DEFAULT 'viewer',added_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        PRIMARY KEY (album_id,user_id)
+    )`)
+    await pool.query(`CREATE TABLE photo_album_items(
+        album_id TEXT NOT NULL REFERENCES photo_albums(id) ON DELETE CASCADE,
+        file_id TEXT NOT NULL REFERENCES files(id) ON DELETE CASCADE,
+        added_by TEXT NOT NULL,added_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),PRIMARY KEY (album_id,file_id)
+    )`)
     globalThis.fetch = (async (_url, init) => new Response(JSON.stringify({ id: (init?.headers as Record<string,string>)?.Authorization === 'Bearer valid' ? 'owner' : 'other' }), {status:200})) as typeof fetch
     await app.register(multipart)
     app.post('/files', postFile)
@@ -106,10 +126,11 @@ test('bulk upload rejects signed-out visitors before storing data', async () => 
 })
 test('storage pressure warns before capacity and blocks writes at the limit', async () => {
     const id = (await pool.query('SELECT id FROM files WHERE path=\'roundtrip\'')).rows[0].id
-    await pool.query('UPDATE files SET storage_size=$2 WHERE id=$1',[id,Math.floor(storageLimit*.85)])
+    await pool.query('UPDATE files SET storage_size=$2 WHERE id=$1',[id,storageLimit])
     const status = await storageStatus()
     expect(status.ok).toBe(true)
     expect(status.warnings).toContain('Upload storage is above 80% capacity.')
-    await expect(persistFile('different-owner',Buffer.alloc(storageLimit*.2),async () => {})).rejects.toBeInstanceOf(StorageError)
+    await expect(persistFile('different-owner',Buffer.from('small upload'),async () => {}))
+        .rejects.toMatchObject({ statusCode: 507 } satisfies Partial<StorageError>)
     await pool.query('UPDATE files SET storage_size=9 WHERE id=$1',[id])
 })

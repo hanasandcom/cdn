@@ -19,6 +19,9 @@
     const dialog = document.querySelector('#album-form')
     const searchInput = document.querySelector('#photo-search')
     const densitySelect = document.querySelector('#grid-density')
+    const selectionActions = document.querySelector('#selection-actions')
+    const librarySidebar = document.querySelector('#photo-library-sidebar')
+    const libraryMenuToggle = document.querySelector('#library-menu-toggle')
     const publicToken = page.dataset.publicToken || ''
     const isPublic = Boolean(publicToken)
     const setGridDensity = value => {
@@ -27,8 +30,38 @@
         if (densitySelect) densitySelect.value = density
         try { localStorage.setItem('cdn-gallery-density', density) } catch { /* Storage may be disabled. */ }
     }
-    try { setGridDensity(localStorage.getItem('cdn-gallery-density') || '5') } catch { setGridDensity('5') }
+    const compactLibrary = window.matchMedia('(max-width: 80rem), (hover: none) and (pointer: coarse)').matches
+    const defaultDensity = compactLibrary ? '3' : '5'
+    try { setGridDensity(localStorage.getItem('cdn-gallery-density') || defaultDensity) } catch { setGridDensity(defaultDensity) }
     densitySelect?.addEventListener('change', () => setGridDensity(densitySelect.value))
+    const setSidebarOpen = open => {
+        if (!librarySidebar || !libraryMenuToggle) return
+        const phone = window.matchMedia('(max-width: 48rem)').matches
+        const tabletQuery = '(min-width: 48.001rem) and (max-width: 80rem), '
+            + '(hover: none) and (pointer: coarse) and (min-width: 48.001rem)'
+        const tablet = window.matchMedia(tabletQuery).matches
+        const expanded = open && (phone || tablet)
+        librarySidebar.classList.toggle('is-open', phone && expanded)
+        page.classList.toggle('sidebar-expanded', tablet && expanded)
+        libraryMenuToggle.setAttribute('aria-expanded', String(expanded))
+        libraryMenuToggle.setAttribute('aria-label', expanded ? 'Close library navigation' : 'Browse library')
+        libraryMenuToggle.title = expanded ? 'Close library navigation' : 'Browse library'
+    }
+    window.addEventListener('resize', () => {
+        const open = libraryMenuToggle?.getAttribute('aria-expanded') === 'true'
+        setSidebarOpen(open)
+    })
+    libraryMenuToggle?.addEventListener('click', () => {
+        const open = libraryMenuToggle.getAttribute('aria-expanded') !== 'true'
+        setSidebarOpen(open)
+    })
+    document.addEventListener('keydown', event => {
+        if (event.key === 'Escape') setSidebarOpen(false)
+    })
+    document.addEventListener('click', event => {
+        if (!window.matchMedia('(max-width: 48rem)').matches || !librarySidebar?.classList.contains('is-open')) return
+        if (!librarySidebar.contains(event.target) && !libraryMenuToggle?.contains(event.target)) setSidebarOpen(false)
+    })
     const state = {
         files: [], allFiles: [], recentFiles: [], albums: [], activeAlbum: null,
         view: 'library', selected: new Set(), offset: 0, recentOffset: 0,
@@ -228,6 +261,7 @@
         const count = state.selected.size
         selectionCount.hidden = !count
         selectionCount.textContent = count ? `${count} selected` : ''
+        if (selectionActions) selectionActions.hidden = count === 0 || state.albums.length === 0
         addButton.disabled = count === 0 || !albumTarget.value
     }
     const matchingPhotoCount = () => state.month
@@ -299,21 +333,36 @@
         if (!owned || !shared) return
         owned.replaceChildren()
         shared.replaceChildren()
+        const sharedSection = document.querySelector('#shared-albums-section')
+        if (sharedSection) sharedSection.hidden = true
         albumTarget.replaceChildren(new Option('Add to album', ''))
         for (const album of state.albums) {
             const button = document.createElement('button')
             button.type = 'button'
             button.className = 'album-nav'
-            button.textContent = `▱ ${album.name}`
+            button.setAttribute('aria-label', album.name)
+            button.title = album.name
+            const icon = document.createElement('span')
+            icon.setAttribute('aria-hidden', 'true')
+            icon.textContent = '▱'
+            const label = document.createElement('span')
+            label.className = 'library-nav-label'
+            label.textContent = album.name
             const count = document.createElement('span')
             count.className = 'count'
             count.textContent = album.photo_count
-            button.append(count)
+            button.append(icon, label, count)
             button.setAttribute('aria-current', state.activeAlbum?.id === album.id ? 'page' : 'false')
-            button.addEventListener('click', () => openAlbum(album.id))
-            ;(album.owner === window.cdnAuthUser?.id ? owned : shared).append(button)
+            button.addEventListener('click', () => {
+                if (window.matchMedia('(max-width: 48rem)').matches) setSidebarOpen(false)
+                openAlbum(album.id)
+            })
+            const isOwned = album.owner === window.cdnAuthUser?.id
+            ;(isOwned ? owned : shared).append(button)
+            if (!isOwned && sharedSection) sharedSection.hidden = false
             albumTarget.add(new Option(album.name, album.id))
         }
+        updateSelection()
     }
 
     const renderFiles = () => {
@@ -643,6 +692,7 @@
         })
     })
     document.querySelectorAll('.library-nav').forEach(button => button.addEventListener('click', async () => {
+        if (window.matchMedia('(max-width: 48rem)').matches) setSidebarOpen(false)
         state.searchRequest++
         state.view = button.dataset.view
         state.activeAlbum = null

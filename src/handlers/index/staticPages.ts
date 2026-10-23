@@ -101,6 +101,7 @@ input:focus-visible { outline-color: #707070; outline-offset: 2px; }
 .upload-panel { display: grid; gap: .75rem; }
 .upload-actions { display: flex; align-items: center; justify-content: space-between; gap: .75rem; flex-wrap: wrap; }
 .upload-submit { min-height: 2.5rem; border: 1px solid #393939; background: #202020; color: #f6f6f3; }
+.upload-submit:disabled { cursor: not-allowed; opacity: .55; }
 .upload-submit:hover { border-color: #777; }
 .upload-status { overflow-wrap: anywhere; }
 .upload-status img { margin-top: .75rem; border-radius: .5rem; }
@@ -181,6 +182,12 @@ hanasand-upload-picker:defined > .picker-fallback { display: none; }
     border-bottom: 1px solid #343436; background: #303033; color: #eee;
 }
 .gallery-page > header nav { display: flex; align-items: center; gap: .5rem; margin-left: auto; }
+#library-menu-toggle {
+    display: none; min-width: 2.5rem; min-height: 2.5rem; border: 1px solid #48484a;
+    border-radius: .65rem; background: #252527; color: #eee; padding: .45rem;
+}
+#library-menu-toggle:hover { background: #3a3a3d; }
+#library-menu-toggle svg { width: 1.2rem; height: 1.2rem; fill: none; stroke: currentColor; stroke-width: 1.8; }
 .gallery-nav-link, .density-control {
     display: inline-flex; min-width: 2.5rem; min-height: 2.5rem; align-items: center;
     justify-content: center; gap: .45rem; border: 1px solid #48484a; border-radius: .65rem;
@@ -201,6 +208,7 @@ hanasand-upload-picker:defined > .picker-fallback { display: none; }
     border-right: 1px solid #343436; background: #202023;
 }
 .library-section { display: grid; gap: .35rem; }
+.library-sidebar-content { display: grid; align-content: start; gap: 1.25rem; }
 .library-section h2 { margin: 0 0 .25rem; color: #999; font-size: .72rem; letter-spacing: .08em; text-transform: uppercase; }
 .library-nav, .album-nav {
     display: flex; width: 100%; align-items: center; gap: .6rem; border: 0;
@@ -210,6 +218,7 @@ hanasand-upload-picker:defined > .picker-fallback { display: none; }
 .library-nav:hover, .library-nav[aria-current="page"], .album-nav:hover,
 .album-nav[aria-current="page"] { border-radius: .6rem; background: #303030; color: #fff; }
 .library-nav .count, .album-nav .count { margin-left: auto; color: #999; font-size: .75rem; }
+.library-nav-label { min-width: 0; }
 .new-album {
     width: 100%; margin-top: .3rem; border: 1px solid #3a3a3a;
     background: #202020; color: #eee; padding: .55rem; font-size: .8rem;
@@ -221,7 +230,6 @@ hanasand-upload-picker:defined > .picker-fallback { display: none; }
 .library-actions input { width: min(15rem, 35vw); min-height: 2.4rem; padding: .5rem .7rem; font-size: .82rem; }
 .date-timeline { display: grid; gap: .4rem; margin: .25rem 0 1rem; }
 .date-range { margin: 0; color: #eee; font-size: 1.2rem; font-weight: 650; }
-.date-location { margin: -.4rem 0 0; color: #999; font-size: .82rem; }
 .timeline-months { display: flex; gap: .35rem; overflow-x: auto; padding: .1rem 0 .35rem; }
 .timeline-months button {
     flex: 0 0 auto; min-height: 2rem; border: 1px solid #353535; border-radius: 999px;
@@ -249,6 +257,7 @@ hanasand-upload-picker:defined > .picker-fallback { display: none; }
 }
 .grid-density-control:focus-within { outline: 2px solid #aaa; outline-offset: 2px; }
 .library-actions button:disabled { opacity: .5; }
+.selection-actions { display: flex; min-width: 0; flex-wrap: wrap; align-items: center; gap: .5rem; }
 .photo-group { margin: 1.25rem 0 2rem; }
 .photo-group-heading { display: flex; align-items: baseline; gap: .75rem; margin: 0 0 .75rem; }
 .photo-group-heading h3 { margin: 0; font-size: 1rem; }
@@ -324,23 +333,52 @@ hanasand-upload-picker:defined > .picker-fallback { display: none; }
     main.login-page header { align-items: flex-start; flex-direction: column; gap: .5rem; }
     main.login-page header nav { align-self: flex-end; }
     .gallery-page > header { min-height: 3rem; padding: .5rem .8rem; }
-    .photo-library-layout { grid-template-columns: minmax(0, 1fr); gap: 0; min-height: calc(100vh - 3rem); }
+    #library-menu-toggle { display: inline-flex; align-items: center; justify-content: center; }
+    .photo-library-layout { position: relative; display: block; min-height: calc(100vh - 3rem); }
     .library-sidebar {
-        grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .75rem;
-        position: static; height: auto; overflow: visible; padding: .75rem .8rem;
-        border-right: 0; border-bottom: 1px solid #343436;
+        display: none; position: absolute; z-index: 8; top: .35rem; left: .5rem;
+        width: min(20rem, calc(100vw - 1rem)); height: auto; max-height: calc(100dvh - 4rem);
+        overflow-y: auto; padding: 1rem; border: 1px solid #444; border-radius: .85rem;
+        background: #202023; box-shadow: 0 1rem 2rem #0009;
     }
-    .library-section { min-width: 0; }
-    .library-section:first-child { grid-column: 1 / -1; }
+    .library-sidebar.is-open { display: grid; grid-template-columns: minmax(0, 1fr); }
+    .library-sidebar-content { gap: .85rem; }
     .library-nav, .album-nav { padding: .5rem; }
-    .library-content { padding: .9rem .8rem 2rem; }
-    .library-toolbar { align-items: flex-start; flex-direction: column; }
-    .library-actions input { width: 100%; }
-    .photo-grid { gap: .5rem; }
+    .library-content { padding: .85rem .8rem 2rem; }
+    .library-toolbar { display: grid; align-items: start; gap: .6rem; margin-bottom: .75rem; }
+    .library-toolbar h2 { font-size: 1.2rem; }
+    .library-actions { display: grid; width: 100%; min-width: 0; grid-template-columns: auto minmax(0, 1fr); gap: .45rem; }
+    .library-actions input { grid-column: 1 / -1; width: 100%; min-width: 0; }
+    .selection-actions { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: .4rem; }
+    .selection-actions select { min-width: 0; width: 100%; }
+    .selection-actions button { min-width: 0; white-space: nowrap; }
+    .selection-count { min-height: 2rem; }
+    .photo-grid { gap: .55rem; }
     .photo-viewer { width: 100vw; height: 100dvh; border: 0; border-radius: 0; }
     .viewer-layout { grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1fr) auto; }
     .viewer-info { max-height: 30dvh; border-top: 1px solid #393939; border-left: 0; padding: .75rem 1rem; }
     .viewer-info h2 { margin-bottom: .5rem; }
+}
+@media (min-width: 48.001rem) and (max-width: 80rem),
+    (hover: none) and (pointer: coarse) and (min-width: 48.001rem) {
+    #library-menu-toggle { display: inline-flex; align-items: center; justify-content: center; }
+    .photo-library-layout { grid-template-columns: 4.25rem minmax(0, 1fr); }
+    .library-sidebar { width: 4.25rem; padding: .85rem .45rem; overflow-x: hidden; }
+    .library-sidebar-content { gap: 1rem; }
+    .library-section { justify-items: center; gap: .3rem; }
+    .library-section h2, .library-nav-label, .library-section > div { display: none; }
+    .library-nav { width: 2.8rem; min-height: 2.8rem; justify-content: center; padding: .5rem; font-size: 1.1rem; }
+    .library-nav span { font-size: 1.2rem; }
+    .new-album { width: 2.8rem; height: 2.8rem; overflow: hidden; padding: .4rem; font-size: 0; }
+    .new-album::before { content: '＋'; font-size: 1.2rem; }
+    .gallery-page.sidebar-expanded .photo-library-layout { grid-template-columns: 15rem minmax(0, 1fr); }
+    .sidebar-expanded .library-sidebar { width: 15rem; padding: 1rem .75rem; }
+    .sidebar-expanded .library-section { justify-items: stretch; }
+    .sidebar-expanded .library-section h2, .sidebar-expanded .library-nav-label,
+    .sidebar-expanded .library-section > div { display: grid; }
+    .sidebar-expanded .library-nav { width: 100%; justify-content: flex-start; font-size: .9rem; }
+    .sidebar-expanded .new-album { width: 100%; height: auto; font-size: .8rem; }
+    .sidebar-expanded .new-album::before { content: none; }
 }
 @media (hover: none) { .photo-select-indicator { opacity: 1; } }
 @media (min-width: 48rem) {
@@ -351,7 +389,9 @@ hanasand-upload-picker:defined > .picker-fallback { display: none; }
 }
 `
 
-function shell(title: string, body: string, options: { mainClass?: string, showBrand?: boolean, account?: string } = {}) {
+function shell(title: string, body: string, options: {
+    mainClass?: string, showBrand?: boolean, showLibraryToggle?: boolean, account?: string
+} = {}) {
     const brand = options.showBrand === false ? '' : '<a href="/" aria-label="Hanasand CDN">Hanasand CDN</a>'
     const bodyClass = options.mainClass === 'gallery-page' ? 'gallery-body' : ''
     const loginAssets = options.mainClass === 'login-page'
@@ -368,6 +408,10 @@ ${loginAssets}
 <main class="${options.mainClass || ''}">
 <header>${brand}
 <nav>
+${options.showLibraryToggle ? `<button id="library-menu-toggle" type="button" aria-controls="photo-library-sidebar"
+aria-expanded="false" aria-label="Browse library" title="Browse library">
+<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16"/></svg></button>
+` : ''}
 <a class="gallery-nav-link" href="/gallery" aria-label="Gallery" title="Gallery">
 <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="8" height="8" rx="1"/>
 <rect x="13" y="3" width="8" height="8" rx="1"/><rect x="3" y="13" width="8" height="8" rx="1"/>
@@ -395,18 +439,24 @@ function uploadAuthScript() {
     return `<script>
 const login = () => location.replace('/login?returnTo=' + encodeURIComponent(location.pathname))
 const fileUrl = id => '/api/files/' + encodeURIComponent(id)
+const authPicker = document.querySelector('#picker')
 window.cdnAuth = fetch('/api/auth/session', { cache: 'no-store', credentials: 'same-origin' }).then(response => {
     if (response.status === 401) return null
     if (!response.ok) throw Error('Your session could not be checked.')
     return response.json()
 }).then(auth => {
-    if (auth) document.querySelector('#upload-hint')?.remove()
-    else if (!document.querySelector('#upload-hint')) {
+    if (auth?.id) {
+        authPicker.setAttribute('multiple', '')
+        document.querySelector('#upload-hint')?.remove()
+    } else {
+        authPicker.removeAttribute('multiple')
+        if (!document.querySelector('#upload-hint')) {
         const hint = document.createElement('p')
         hint.id = 'upload-hint'
         hint.className = 'upload-hint'
         hint.textContent = 'Sign in to upload multiple files at once.'
         document.querySelector('.upload-actions')?.prepend(hint)
+        }
     }
     return auth
 })
@@ -421,7 +471,7 @@ export async function getUploadPage(req: FastifyRequest, res: FastifyReply) {
     const guestHint = userId ? '' : '<p id="upload-hint" class="upload-hint">Sign in to upload multiple files at once.</p>'
     const body = `<p class="intro">Upload images, videos or files.</p>
 <form id="upload" class="upload-panel">
-<hanasand-upload-picker id="picker" multiple
+<hanasand-upload-picker id="picker"
     description="Choose files to upload, or drag them into the drop area.">
 <div class="picker-fallback" aria-hidden="true">
 <div class="picker-fallback-drop-side">
@@ -436,7 +486,7 @@ export async function getUploadPage(req: FastifyRequest, res: FastifyReply) {
 </hanasand-upload-picker>
 <div class="upload-actions">
 ${guestHint}
-<button class="upload-submit" type="submit">Upload</button>
+<button class="upload-submit" type="submit" disabled>Upload</button>
 </div>
 </form>
 <p id="status" class="upload-status" role="status" aria-live="polite"></p>
@@ -448,6 +498,10 @@ const form = document.querySelector('#upload')
 const picker = document.querySelector('#picker')
 const status = document.querySelector('#status')
 const button = form.querySelector('.upload-submit')
+let uploadInProgress = false
+const syncUploadButton = () => { button.disabled = uploadInProgress || !(picker.files && picker.files.length) }
+picker.addEventListener('fileschange', syncUploadButton)
+syncUploadButton()
 const wait = ms => new Promise(resolve => setTimeout(resolve, ms))
 const addLink = (parent, url, text) => {
     const link = document.createElement('a')
@@ -457,9 +511,11 @@ const addLink = (parent, url, text) => {
 }
 form.addEventListener('submit', async event => {
     event.preventDefault()
-    const files = picker.files
-    if (!files.length) return
-    button.disabled = true
+    const files = picker.files || []
+    if (!files.length || uploadInProgress) return
+    uploadInProgress = true
+    picker.setAttribute('disabled', '')
+    syncUploadButton()
     try {
         const auth = await window.cdnAuth
         status.textContent = 'Preparing upload…'
@@ -609,7 +665,9 @@ form.addEventListener('submit', async event => {
     } catch (error) {
         status.textContent = error.message || 'Upload failed.'
     } finally {
-        button.disabled = false
+        uploadInProgress = false
+        picker.removeAttribute('disabled')
+        syncUploadButton()
     }
 })
 </script>`
@@ -635,17 +693,24 @@ export async function getGalleryPage(_req: FastifyRequest, res: FastifyReply) {
     if (session) setSessionCookies(_req, res, session)
     const account = session ? accountActions() : ''
     const body = `<div id="photo-library" class="photo-library-layout" aria-busy="true">
-<aside class="library-sidebar" aria-label="Photo library">
+<aside id="photo-library-sidebar" class="library-sidebar" aria-label="Photo library">
+<div class="library-sidebar-content">
 <div class="library-section"><h2>Library</h2>
-<button class="library-nav" data-view="library" aria-current="page"><span>▦</span> All photos</button>
-<button class="library-nav" data-view="recent"><span>◷</span> Recent</button></div>
+<button class="library-nav" data-view="library" aria-current="page" aria-label="All photos" title="All photos">
+<span aria-hidden="true">▦</span><span class="library-nav-label">All photos</span></button>
+<button class="library-nav" data-view="recent" aria-label="Recent" title="Recent">
+<span aria-hidden="true">◷</span><span class="library-nav-label">Recent</span></button></div>
 <div class="library-section"><h2>Collections</h2>
-<button class="library-nav" data-view="favorites"><span>♡</span> Favorites</button>
-<button class="library-nav" data-view="images"><span>▧</span> Images</button>
-<button class="library-nav" data-view="videos"><span>▷</span> Videos</button></div>
+<button class="library-nav" data-view="favorites" aria-label="Favorites" title="Favorites">
+<span aria-hidden="true">♡</span><span class="library-nav-label">Favorites</span></button>
+<button class="library-nav" data-view="images" aria-label="Images" title="Images">
+<span aria-hidden="true">▧</span><span class="library-nav-label">Images</span></button>
+<button class="library-nav" data-view="videos" aria-label="Videos" title="Videos">
+<span aria-hidden="true">▷</span><span class="library-nav-label">Videos</span></button></div>
 <div class="library-section"><h2>Albums</h2><div id="owned-albums"></div>
-<button id="create-album" class="new-album" type="button">＋ New album</button></div>
-<div class="library-section"><h2>Shared with me</h2><div id="shared-albums"></div></div>
+<button id="create-album" class="new-album" type="button" aria-label="New album" title="New album">＋ New album</button></div>
+<div class="library-section" id="shared-albums-section" hidden><h2>Shared with me</h2><div id="shared-albums"></div></div>
+</div>
 </aside>
 <section class="library-content" aria-label="Photos">
 <div class="library-toolbar"><h2 id="view-title">Library</h2><div class="library-actions">
@@ -659,9 +724,11 @@ export async function getGalleryPage(_req: FastifyRequest, res: FastifyReply) {
 <option value="5" selected>5 per row</option></select>
 </label>
 <span id="selection-count" class="selection-count" aria-live="polite" aria-atomic="true" hidden></span>
+<div id="selection-actions" class="selection-actions" hidden>
 <select id="album-target" aria-label="Choose an album"><option value="">Add to album</option></select>
 <button id="add-to-album" type="button" disabled>Add selected</button>
 <button id="manage-album" type="button" hidden>Share</button>
+</div>
 <button id="load-more" type="button" hidden>Load more</button>
 </div></div>
 <div id="date-timeline" class="date-timeline" aria-label="Browse by date" hidden></div>
@@ -687,7 +754,7 @@ window.cdnAuth = fetch('/api/auth/session', { cache: 'no-store', credentials: 's
 <script src="/assets/gallery.js" defer></script>`
     return res.header('Cache-Control', 'private, no-store').type('text/html').send(
         shell('Library', body, {
-            mainClass: 'gallery-page', showBrand: false,
+            mainClass: 'gallery-page', showBrand: false, showLibraryToggle: true,
             account,
         }),
     )
