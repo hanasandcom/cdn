@@ -40,13 +40,26 @@
         const tabletQuery = '(min-width: 48.001rem) and (max-width: 80rem), '
             + '(hover: none) and (pointer: coarse) and (min-width: 48.001rem)'
         const tablet = window.matchMedia(tabletQuery).matches
-        const expanded = open && (phone || tablet)
+        const desktop = !phone && !tablet
+        const expanded = desktop ? open : open && (phone || tablet)
         librarySidebar.classList.toggle('is-open', phone && expanded)
         page.classList.toggle('sidebar-expanded', tablet && expanded)
+        page.classList.toggle('sidebar-collapsed', desktop && !expanded)
         libraryMenuToggle.setAttribute('aria-expanded', String(expanded))
-        libraryMenuToggle.setAttribute('aria-label', expanded ? 'Close library navigation' : 'Browse library')
-        libraryMenuToggle.title = expanded ? 'Close library navigation' : 'Browse library'
+        const label = phone ? (expanded ? 'Close library navigation' : 'Browse library')
+            : (expanded ? 'Collapse sidebar' : 'Expand sidebar')
+        libraryMenuToggle.setAttribute('aria-label', label)
+        libraryMenuToggle.title = label
+        if (desktop) {
+            try { localStorage.setItem('cdn-gallery-sidebar-collapsed', String(!expanded)) } catch { /* Storage may be disabled. */ }
+        }
     }
+    const phoneViewport = window.matchMedia('(max-width: 48rem)').matches
+    const tabletViewport = window.matchMedia('(min-width: 48.001rem) and (max-width: 80rem), '
+        + '(hover: none) and (pointer: coarse) and (min-width: 48.001rem)').matches
+    let desktopSidebarOpen = true
+    try { desktopSidebarOpen = localStorage.getItem('cdn-gallery-sidebar-collapsed') !== 'true' } catch { /* Storage may be disabled. */ }
+    setSidebarOpen(!phoneViewport && !tabletViewport ? desktopSidebarOpen : false)
     window.addEventListener('resize', () => {
         const open = libraryMenuToggle?.getAttribute('aria-expanded') === 'true'
         setSidebarOpen(open)
@@ -56,7 +69,12 @@
         setSidebarOpen(open)
     })
     document.addEventListener('keydown', event => {
-        if (event.key === 'Escape') setSidebarOpen(false)
+        if (event.key === 'Escape'
+            && (window.matchMedia('(max-width: 48rem)').matches
+                || window.matchMedia('(min-width: 48.001rem) and (max-width: 80rem), '
+                    + '(hover: none) and (pointer: coarse) and (min-width: 48.001rem)').matches)) {
+            setSidebarOpen(false)
+        }
     })
     document.addEventListener('click', event => {
         if (!window.matchMedia('(max-width: 48rem)').matches || !librarySidebar?.classList.contains('is-open')) return

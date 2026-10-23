@@ -106,19 +106,19 @@ input:focus-visible { outline-color: #707070; outline-offset: 2px; }
     margin: 0; padding: .75rem; border: 1px solid #784747;
     border-radius: .55rem; background: #281818; color: #f6bcbc;
 }
-.account-actions { display: flex; align-items: center; gap: .6rem; margin-left: auto; }
+.account-actions { display: flex; align-items: center; gap: .5rem; margin-left: 0; }
 .profile-icon {
-    display: grid; width: 2rem; height: 2rem; place-items: center;
-    border: 1px solid #383838; border-radius: 50%; background: #191919;
+    display: grid; width: 2.5rem; min-width: 2.5rem; height: 2.5rem; place-items: center;
+    border: 1px solid #383838; border-radius: .65rem; background: #191919;
     color: #eee; font-size: .85rem; font-weight: 700;
 }
 .profile-icon svg { width: 1.1rem; height: 1.1rem; fill: none; stroke: currentColor; stroke-width: 1.7; }
 .sign-out {
-    display: inline-flex; min-height: 2.2rem; align-items: center;
-    padding: .4rem .7rem; border: 1px solid #383838; border-radius: .55rem;
+    display: inline-flex; min-height: 2.5rem; align-items: center;
+    padding: .45rem .65rem; border: 1px solid #383838; border-radius: .65rem; background: #191919;
     text-decoration: none; font-size: .82rem;
 }
-.sign-out:hover { background: #383838; }
+.sign-out:hover { background: #292929; }
 .intro { max-width: 42rem; margin: .5rem 0 1.5rem; }
 .upload-panel { display: grid; gap: .75rem; }
 .upload-actions { display: flex; align-items: center; justify-content: space-between; gap: .75rem; flex-wrap: wrap; }
@@ -205,9 +205,14 @@ hanasand-upload-picker:defined > .picker-fallback { display: none; }
     position: sticky; z-index: 5; top: 0; min-height: 3.5rem; padding: .55rem 1.25rem;
     border-bottom: 1px solid #383838; background: #101010; color: #eee;
 }
+.gallery-page > header.cdn-header--gallery { margin-bottom: 0; }
 .gallery-page > header nav { display: flex; align-items: center; gap: .5rem; margin-left: auto; }
+.gallery-page > header .hanasand-header__actions { width: auto; flex: 0 0 auto; margin-left: auto; }
+.gallery-page > header .cdn-header-actions { width: auto; justify-content: flex-end; margin-left: auto; }
+.gallery-page > header .account-actions { margin-left: 0; }
 #library-menu-toggle {
-    display: none; min-width: 2.5rem; min-height: 2.5rem; border: 1px solid #383838;
+    display: inline-flex; min-width: 2.5rem; min-height: 2.5rem; align-items: center; justify-content: center;
+    border: 1px solid #383838;
     border-radius: .65rem; background: #191919; color: #eee; padding: .45rem;
 }
 #library-menu-toggle:hover { background: #292929; }
@@ -225,6 +230,21 @@ hanasand-upload-picker:defined > .picker-fallback { display: none; }
 }
 .density-control:focus-within { outline: 2px solid #999; outline-offset: 2px; }
 .photo-library-layout { display: grid; grid-template-columns: 16rem minmax(0, 1fr); gap: 0; min-height: calc(100vh - 3.5rem); margin: 0; }
+.gallery-page.sidebar-collapsed .photo-library-layout { grid-template-columns: 4.25rem minmax(0, 1fr); }
+.gallery-page.sidebar-collapsed .library-sidebar { width: 4.25rem; padding: .85rem .45rem; overflow-x: hidden; }
+.gallery-page.sidebar-collapsed .library-section { justify-items: center; gap: .3rem; }
+.gallery-page.sidebar-collapsed .library-section h2,
+.gallery-page.sidebar-collapsed .library-nav-label,
+.gallery-page.sidebar-collapsed .album-nav .count { display: none; }
+.gallery-page.sidebar-collapsed .library-nav,
+.gallery-page.sidebar-collapsed .album-nav {
+    width: 2.8rem; min-height: 2.8rem; justify-content: center; padding: .5rem; font-size: 1.1rem;
+}
+.gallery-page.sidebar-collapsed .library-nav span { font-size: 1.2rem; }
+.gallery-page.sidebar-collapsed .new-album {
+    width: 2.8rem; height: 2.8rem; overflow: hidden; padding: .4rem; font-size: 0;
+}
+.gallery-page.sidebar-collapsed .new-album::before { content: '＋'; font-size: 1.2rem; }
 .public-library { grid-template-columns: minmax(0, 1fr); }
 .library-sidebar {
     position: sticky; top: 3.5rem; display: grid; height: calc(100vh - 3.5rem); overflow-y: auto;
@@ -359,7 +379,6 @@ hanasand-upload-picker:defined > .picker-fallback { display: none; }
     main.login-page header { align-items: flex-start; flex-direction: column; gap: .5rem; }
     main.login-page header nav { align-self: flex-end; }
     .gallery-page > header { min-height: 3rem; padding: .5rem .8rem; }
-    #library-menu-toggle { display: inline-flex; align-items: center; justify-content: center; }
     .photo-library-layout { position: relative; display: block; min-height: calc(100vh - 3rem); }
     .library-sidebar {
         display: none; position: absolute; z-index: 8; top: .35rem; left: .5rem;
@@ -392,8 +411,8 @@ hanasand-upload-picker:defined > .picker-fallback { display: none; }
     .library-sidebar { width: 4.25rem; padding: .85rem .45rem; overflow-x: hidden; }
     .library-sidebar-content { gap: 1rem; }
     .library-section { justify-items: center; gap: .3rem; }
-    .library-section h2, .library-nav-label, .library-section > div { display: none; }
-    .library-nav { width: 2.8rem; min-height: 2.8rem; justify-content: center; padding: .5rem; font-size: 1.1rem; }
+    .library-section h2, .library-nav-label, .album-nav .count { display: none; }
+    .library-nav, .album-nav { width: 2.8rem; min-height: 2.8rem; justify-content: center; padding: .5rem; font-size: 1.1rem; }
     .library-nav span { font-size: 1.2rem; }
     .new-album { width: 2.8rem; height: 2.8rem; overflow: hidden; padding: .4rem; font-size: 0; }
     .new-album::before { content: '＋'; font-size: 1.2rem; }
