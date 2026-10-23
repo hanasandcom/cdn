@@ -10,6 +10,8 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+      args:
+        HANASAND_RELEASE_COMMIT: ${HANASAND_RELEASE_COMMIT:-unknown}
     depends_on:
       - postgres
     env_file:
@@ -20,6 +22,7 @@ services:
       DB_HOST: postgres
       VM_API_TOKEN: ${VM_API_TOKEN}
       CDN_AUTH_API_URL: ${CDN_AUTH_API_URL:-http://identity:8081/api}
+      HANASAND_RELEASE_COMMIT: ${HANASAND_RELEASE_COMMIT:-unknown}
     networks:
       - default
       - identity
