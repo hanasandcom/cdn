@@ -13,7 +13,8 @@ services:
       args:
         HANASAND_RELEASE_COMMIT: ${HANASAND_RELEASE_COMMIT:-unknown}
     depends_on:
-      - postgres
+      postgres:
+        condition: service_healthy
     env_file:
       .env
     environment:
@@ -27,7 +28,11 @@ services:
       - default
       - identity
     volumes:
-      - data:/var/lib/cdn/files
+      - type: bind
+        source: ${CDN_FILES_DIR:-/data/cdn/files}
+        target: /var/lib/cdn/files
+        bind:
+          create_host_path: false
     healthcheck:
       test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:8080/health"]
       interval: 30s
@@ -48,7 +53,11 @@ services:
       POSTGRES_PASSWORD: ${DB_PASSWORD}
       POSTGRES_DB: ${DB:-cdn}
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      - type: bind
+        source: ${CDN_POSTGRES_DIR:-/data/cdn/postgres}
+        target: /var/lib/postgresql/data
+        bind:
+          create_host_path: false
       - ./db/init.sql:/docker-entrypoint-initdb.d/init.sql
     ports:
       - "8502:5432"
@@ -67,7 +76,8 @@ services:
       context: ./cron
       dockerfile: Dockerfile
     depends_on:
-      - postgres
+      postgres:
+        condition: service_healthy
     environment:
       DB_USER: cdn
       DB_PASSWORD: ${DB_PASSWORD}
@@ -79,10 +89,6 @@ services:
       timeout: 5s
       retries: 3
 
-volumes:
-  data:
-    name: cdn_data
-  postgres_data:
 networks:
   identity:
     external: true

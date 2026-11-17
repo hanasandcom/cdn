@@ -4,7 +4,9 @@ Standalone file storage and sharing service for Hanasand. The CDN host serves it
 
 ## Run with Docker Compose
 
-Install Docker Compose v2 and create a local `.env` file with `DB_PASSWORD` set. The Compose project is named `cdn`, with its own PostgreSQL database and persistent file volume. The service also joins the external Identity network so it can create and validate account sessions; create that network before starting the stack. `CDN_AUTH_API_URL` defaults to `http://identity:8081/api`.
+Install Docker Compose v2 and create a local `.env` file with `DB_PASSWORD` set. The Compose project is named `cdn`, with its own PostgreSQL database and persistent file storage. The service also joins the external Identity network so it can create and validate account sessions; create that network before starting the stack. `CDN_AUTH_API_URL` defaults to `http://identity:8081/api`.
+
+On Inspur, follow [storage and deployment](docs/storage.md) and use `./scripts/deploy-inspur.sh`. PostgreSQL and uploaded files live under `/data/cdn` on the data RAID. Existing installations must migrate their data before using these paths. For local development, set `CDN_POSTGRES_DIR` and `CDN_FILES_DIR` to prepared local directories.
 
 From this directory:
 
@@ -48,6 +50,6 @@ The API listens on port `8081` by default. Run `bun run test:e2e:traffic` agains
 
 Guest uploads allow one file per second and one in-flight upload per client IP. Their files use a keyed IP pseudonym for ownership and share the 5 GiB per-owner storage limit; the raw client IP is not stored in the file owner field. Users behind the same public IP share the guest limit. Guests cannot use bulk upload. Signed-in standard uploads are limited to one file per second per account. The authenticated bulk endpoint accepts up to 5,000 files and 45 MiB per request and applies a per-account rate of 5,000 files per second; the rate is an admission limit, not a promise that the network, disk, and database can persist 5,000 files in one second. Files larger than 45 MiB are sent through the standard endpoint. Upload requests are limited to four concurrent requests across the service. Each file is limited to 50 MiB. Default per-account storage is 5 GiB and total storage is 100 GiB. Uploads stop when the volume has less than 10 GiB free. These limits can be changed with `CDN_USER_STORAGE_LIMIT_BYTES`, `CDN_STORAGE_LIMIT_BYTES`, and `CDN_MIN_FREE_BYTES`.
 
-New files are stored in the Compose volume mounted at `/var/lib/cdn/files`; PostgreSQL stores ownership and file metadata. Back up both the database and file volume. Existing database-backed files remain readable.
+New files are stored in `/data/cdn/files`, mounted at `/var/lib/cdn/files`; PostgreSQL stores ownership and file metadata in `/data/cdn/postgres`. Back up both directories together. Existing database-backed files remain readable.
 
 `GET /health` checks the database and file storage. Browser access from Hanasand is limited by CORS to the configured origins (`CDN_CORS_ORIGINS`). Uploaded files with supported image or video types may render inline; other types are downloaded as attachments.
