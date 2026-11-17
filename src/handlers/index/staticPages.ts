@@ -281,10 +281,10 @@ hanasand-upload-picker:defined > .picker-fallback { display: none; }
     border-radius: .5rem; background: transparent; color: #aaa; font-size: 1.25rem;
 }
 @media (hover: hover) and (pointer: fine) {
-    .album-actions { opacity: 0; }
+    .album-actions { position: absolute; opacity: 0; pointer-events: none; }
     .album-row:hover .album-actions,
     .album-row:focus-within .album-actions,
-    .album-actions[aria-expanded="true"] { opacity: 1; }
+    .album-actions[aria-expanded="true"] { position: static; opacity: 1; pointer-events: auto; }
 }
 .album-actions:hover, .album-actions[aria-expanded="true"] { background: #292929; color: #fff; }
 .album-context-menu {
