@@ -17,14 +17,16 @@ import tokenWrapper from '../src/utils/auth/tokenWrapper.ts'
 
 async function page(handler: typeof getUploadPage, request = {}) {
     let html = ''
+    let redirectUrl = ''
     const headers: Record<string, string> = {}
     const reply = {
         header: (name: string, value: string) => { headers[name] = value; return reply },
         type: () => reply,
         send: (body: string) => { html = body; return body },
+        redirect: (url: string) => { redirectUrl = url; return reply },
     }
     await handler({ headers: {}, ...request } as never, reply as never)
-    return { html, headers }
+    return { html, headers, redirectUrl }
 }
 
 type ScriptHandler = typeof getUploadPickerScript | typeof getBulkUploadScript
@@ -183,11 +185,23 @@ describe('standalone CDN pages', () => {
 
     test('upload supports guests while the gallery requires a session', async () => {
         const uploadPage = await page(getUploadPage)
-        const galleryPage = await page(getGalleryPage)
+        const originalFetch = globalThis.fetch
+        globalThis.fetch = (async () => new Response(JSON.stringify({
+            id: 'user-1', token: 'session-token', expires_at: '2099-10-24T00:00:00.000Z',
+        }), { status: 200, headers: { 'Content-Type': 'application/json' } })) as typeof fetch
+        let galleryPage: Awaited<ReturnType<typeof page>>
+        try {
+            galleryPage = await page(getGalleryPage, {
+                headers: { host: 'cdn.hanasand.com', cookie: 'id=user-1; access_token=session-token' },
+                protocol: 'https', url: '/gallery', method: 'GET',
+            })
+        } finally { globalThis.fetch = originalFetch }
         const loginPage = await page(getLoginPage)
         const { html: upload, headers: uploadHeaders } = uploadPage
         const { html: gallery, headers: galleryHeaders } = galleryPage
-        const { html: login, headers: loginHeaders } = loginPage
+        const { headers: loginHeaders } = loginPage
+        expect(loginPage.html).toBe('')
+        expect(loginPage.redirectUrl).toBe('https://identity.hanasand.com/login?returnTo=https%3A%2F%2Fcdn.hanasand.com%2Fgallery')
         const galleryClient = await script(getGalleryClientScript)
 
         const uploadScripts = Array.from(upload.matchAll(/<script>([\s\S]*?)<\/script>/g))
@@ -271,28 +285,6 @@ describe('standalone CDN pages', () => {
         expect(gallery).not.toContain('aria-label="Hanasand CDN"')
         expect(gallery).toContain('class="photo-viewer"')
         expect(() => new Function(galleryClient)).not.toThrow()
-        expect(login).toContain('main.login-page { width: min(100%, 42rem); max-width: 42rem;')
-        expect(login).not.toContain('Sign in to your Hanasand account to upload files and view your library.')
-        expect(login).toContain('<link rel="stylesheet" href="/assets/login-form.css"><script src="/assets/login-form.js" defer></script>')
-        expect(login).not.toContain('/api/auth/device-proof-client.js')
-        expect(login).not.toContain('api/auth/login-form.js')
-        expect(login).toContain('<form action="/api/auth/login" method="post"')
-        expect(login).toContain('<hanasand-login-form passkey-options-url="/api/auth/passkeys/authenticate/options"')
-        expect(login).toContain('name="username" type="text" autocomplete="username"')
-        expect(login).toContain('name="password" type="password" autocomplete="current-password"')
-        expect(login).toContain('Continue with Google</a>')
-        expect(login).toContain('data-hanasand-passkey>Sign in with passkey</button>')
-        expect(login).toContain('passkey-options-url="/api/auth/passkeys/authenticate/options"')
-        expect(login).toContain('passkey-verify-url="/api/auth/passkeys/authenticate/verify"')
-        expect(login).toContain('sso-href="/api/auth/sso/start?redirectPath=%2Fgallery"')
-        expect(login).toContain('redirect-path="/gallery"')
-        expect(login).toContain('input:focus, input:focus-visible {')
-        expect(login).toContain('background-color: #080808; color: #f6f6f3; border-color: #707070;')
-        expect(login).toContain('input::selection { background: #292929; color: #f6f6f3; }')
-        expect(login).toContain('input:-webkit-autofill')
-        expect(login).toContain('button:focus-visible, a:focus-visible, input:focus-visible')
-        expect(login).toContain('outline: 2px solid #999;')
-        expect(login).toContain('input:focus-visible { outline-color: #707070; outline-offset: 2px; }')
         expect(galleryClient).toContain('preview.src = fileUrl(file.id, !isVideo)')
         expect(galleryClient).toContain('viewer.showModal()')
         expect(galleryClient).toContain('viewerImage.src = url')
@@ -302,8 +294,6 @@ describe('standalone CDN pages', () => {
         expect(galleryClient).toContain('location.replace(\'/login?returnTo=\'')
         expect(upload).not.toContain('https://hanasand.com/upload')
         expect(gallery).not.toContain('https://hanasand.com/gallery')
-        expect(login).not.toContain('new FormData(form)')
-        expect(login).not.toContain('hanasand.com/login')
         expect(uploadHeaders['Cache-Control']).toBe('private, no-store')
         expect(galleryHeaders['Cache-Control']).toBe('private, no-store')
         expect(loginHeaders['Cache-Control']).toBe('private, no-store')
@@ -321,14 +311,31 @@ describe('standalone CDN pages', () => {
         expect(logo.body.length).toBeGreaterThan(0)
     })
 
-    test('keeps login return paths on CDN and escapes markup', async () => {
-        const { html } = await page(getLoginPage, { query: { returnTo: '/gallery?sort=date&view=images' } })
-        expect(html).toContain('redirect-path="/gallery?sort=date&amp;view=images"')
-        expect(html).toContain('sso-href="/api/auth/sso/start?redirectPath=%2Fgallery%3Fsort%3Ddate%26view%3Dimages"')
+    test('login redirects to hosted Identity with a safe CDN return URL', async () => {
+        for (const [returnTo, expected] of [
+            ['/gallery?sort=date&view=images', 'https://cdn.hanasand.com/gallery?sort=date&view=images'],
+            ['/upload', 'https://cdn.hanasand.com/upload'],
+            ['//attacker.example/path', 'https://cdn.hanasand.com/gallery'],
+            ['https://attacker.example/path', 'https://cdn.hanasand.com/gallery'],
+            ['/\\attacker.example/path', 'https://cdn.hanasand.com/gallery'],
+            ['javascript:alert(1)', 'https://cdn.hanasand.com/gallery'],
+            [undefined, 'https://cdn.hanasand.com/gallery'],
+        ]) {
+            const result = await page(getLoginPage, { query: { returnTo } })
+            const target = new URL(result.redirectUrl)
+            expect(target.origin).toBe('https://identity.hanasand.com')
+            expect(target.pathname).toBe('/login')
+            expect(target.searchParams.get('returnTo')).toBe(expected)
+            expect(result.html).toBe('')
+            expect(result.headers['Cache-Control']).toBe('private, no-store')
+        }
+    })
 
-        const { html: unsafe } = await page(getLoginPage, { query: { returnTo: '//attacker.example/path' } })
-        expect(unsafe).toContain('redirect-path="/gallery"')
-        expect(unsafe).toContain('sso-href="/api/auth/sso/start?redirectPath=%2Fgallery"')
+    test('signed-out gallery visits redirect before serving library HTML', async () => {
+        const result = await page(getGalleryPage)
+        expect(result.redirectUrl).toBe('https://identity.hanasand.com/login?returnTo=https%3A%2F%2Fcdn.hanasand.com%2Fgallery')
+        expect(result.html).toBe('')
+        expect(result.headers['Cache-Control']).toBe('private, no-store')
     })
 
     test('serves the shared picker and image metadata assets', async () => {

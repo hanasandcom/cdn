@@ -3,7 +3,6 @@ import { readFile } from 'node:fs/promises'
 import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { Header } from 'hanasand'
-import { renderHanasandLoginFormMarkup } from 'hanasand/auth'
 import { getSessionDetails, setSessionCookies } from '#utils/auth/session.ts'
 import { safeCdnReturnPath } from '#utils/auth/safeCdnReturnPath.ts'
 
@@ -581,21 +580,20 @@ ${uploadAuthScript()}
 export async function getLoginPage(req: FastifyRequest, res: FastifyReply) {
     const query = req.query as { returnTo?: unknown } | undefined
     const redirectPath = safeCdnReturnPath(query?.returnTo)
-    const ssoHref = `/api/auth/sso/start?redirectPath=${encodeURIComponent(redirectPath)}`
-    const body = renderHanasandLoginFormMarkup({
-        loginUrl: '/api/auth/login',
-        passkeyOptionsUrl: '/api/auth/passkeys/authenticate/options',
-        passkeyVerifyUrl: '/api/auth/passkeys/authenticate/verify',
-        ssoHref,
-        redirectPath,
-    })
-    return res.header('Cache-Control', 'private, no-store').type('text/html').send(shell('Sign in', body, { mainClass: 'login-page' }))
+    const identityLogin = new URL('https://identity.hanasand.com/login')
+    identityLogin.searchParams.set('returnTo', new URL(redirectPath, 'https://cdn.hanasand.com').href)
+    return res.header('Cache-Control', 'private, no-store').redirect(identityLogin.href)
 }
 
-export async function getGalleryPage(_req: FastifyRequest, res: FastifyReply) {
-    const session = await getSessionDetails(_req)
-    if (session) setSessionCookies(_req, res, session)
-    const account = !!session
+export async function getGalleryPage(req: FastifyRequest, res: FastifyReply) {
+    const session = await getSessionDetails(req)
+    if (!session) {
+        const identityLogin = new URL('https://identity.hanasand.com/login')
+        identityLogin.searchParams.set('returnTo', 'https://cdn.hanasand.com/gallery')
+        return res.header('Cache-Control', 'private, no-store').redirect(identityLogin.href)
+    }
+    setSessionCookies(req, res, session)
+    const account = true
     const body = `<div id="photo-library" class="photo-library-layout" aria-busy="true">
 <aside id="photo-library-sidebar" class="library-sidebar" aria-label="Photo library">
 <div class="library-sidebar-header"><h2>Library</h2>
