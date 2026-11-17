@@ -1,4 +1,4 @@
-/* global window, document, location, navigator, fetch, Option, URLSearchParams, clearTimeout, setTimeout, localStorage */
+/* global CSS, window, document, location, navigator, fetch, Option, URLSearchParams, clearTimeout, setTimeout, localStorage */
 (() => {
     const page = document.querySelector('#photo-library')
     if (!page) return
@@ -83,7 +83,7 @@
         setSidebarOpen(open)
     })
     document.addEventListener('keydown', event => {
-        if (event.key === 'Escape'
+        if (event.key === 'Escape' && !dialog?.open
             && (window.matchMedia('(max-width: 48rem)').matches
                 || window.matchMedia('(min-width: 48.001rem) and (max-width: 80rem), '
                     + '(hover: none) and (pointer: coarse) and (min-width: 48.001rem)').matches)) {
@@ -91,7 +91,8 @@
         }
     })
     document.addEventListener('click', event => {
-        if (!window.matchMedia('(max-width: 48rem)').matches || !librarySidebar?.classList.contains('is-open')) return
+        if (dialog?.open || !albumMenu.hidden || !window.matchMedia('(max-width: 48rem)').matches
+            || !librarySidebar?.classList.contains('is-open')) return
         if (!librarySidebar.contains(event.target) && !libraryMenuToggle?.contains(event.target)) setSidebarOpen(false)
     })
     const state = {
@@ -359,6 +360,98 @@
         if (event.key === 'ArrowRight') movePhoto(1)
     })
 
+    const albumStatus = document.querySelector('#album-status')
+    const showAlbumStatus = (message, failed = false) => {
+        if (!albumStatus) return
+        albumStatus.textContent = message
+        albumStatus.hidden = false
+        albumStatus.setAttribute('role', failed ? 'alert' : 'status')
+    }
+    const albumMenu = document.createElement('div')
+    albumMenu.id = 'album-context-menu'
+    albumMenu.className = 'album-context-menu'
+    albumMenu.setAttribute('role', 'menu')
+    albumMenu.hidden = true
+    if (!isPublic) document.body.append(albumMenu)
+    let menuTrigger = null
+    const closeAlbumMenu = (restoreFocus = true) => {
+        albumMenu.hidden = true
+        menuTrigger?.setAttribute('aria-expanded', 'false')
+        if (restoreFocus && menuTrigger?.isConnected) menuTrigger.focus()
+        menuTrigger = null
+    }
+    const openAlbumMenu = (album, x, y, trigger) => {
+        closeAlbumMenu(false)
+        menuTrigger = trigger
+        trigger.setAttribute('aria-expanded', 'true')
+        albumMenu.replaceChildren()
+        albumMenu.setAttribute('aria-label', `Actions for ${album.name}`)
+        const owner = album.owner === window.cdnAuthUser?.id
+        const actions = [
+            ['Open album', () => openAlbum(album.id)],
+            ...(owner ? [['Rename…', () => renameAlbum(album)]] : []),
+            [album.is_pinned ? 'Unpin album' : 'Pin album', async () => {
+                await api(`/api/albums/${encodeURIComponent(album.id)}/pin`, {
+                    method: 'PUT', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ isPinned: !album.is_pinned }),
+                })
+                await loadAlbums()
+                showAlbumStatus(album.is_pinned ? 'Album unpinned.' : 'Album pinned for your account.')
+                document.querySelector(`[data-album-id="${CSS.escape(album.id)}"] .album-actions`)?.focus()
+            }],
+            ...(owner ? [
+                ['Share…', () => shareAlbum(album.id)],
+                ['Delete album…', () => confirmAlbumDeletion(album), true],
+            ] : []),
+        ]
+        for (const [label, action, destructive] of actions) {
+            if (destructive) {
+                const separator = document.createElement('div')
+                separator.setAttribute('role', 'separator')
+                albumMenu.append(separator)
+            }
+            const button = document.createElement('button')
+            button.type = 'button'
+            button.setAttribute('role', 'menuitem')
+            button.tabIndex = -1
+            button.textContent = label
+            if (destructive) button.className = 'danger'
+            button.addEventListener('click', () => {
+                closeAlbumMenu()
+                Promise.resolve().then(action).catch(error => showAlbumStatus(error.message, true))
+            })
+            albumMenu.append(button)
+        }
+        albumMenu.hidden = false
+        albumMenu.style.left = '0px'
+        albumMenu.style.top = '0px'
+        const rect = albumMenu.getBoundingClientRect()
+        albumMenu.style.left = `${Math.max(8, Math.min(x, window.innerWidth - rect.width - 8))}px`
+        albumMenu.style.top = `${Math.max(8, Math.min(y, window.innerHeight - rect.height - 8))}px`
+        albumMenu.querySelector('button')?.focus()
+    }
+    albumMenu.addEventListener('keydown', event => {
+        const items = [...albumMenu.querySelectorAll('[role="menuitem"]')]
+        const index = items.indexOf(document.activeElement)
+        if (['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(event.key)) {
+            event.preventDefault()
+            const next = event.key === 'Home' ? 0 : event.key === 'End' ? items.length - 1
+                : (index + (event.key === 'ArrowDown' ? 1 : -1) + items.length) % items.length
+            items[next]?.focus()
+        } else if (event.key === 'Escape' || event.key === 'Tab') {
+            if (event.key === 'Escape') event.preventDefault()
+            closeAlbumMenu()
+        }
+        event.stopPropagation()
+    })
+    document.addEventListener('pointerdown', event => {
+        if (!albumMenu.hidden && !albumMenu.contains(event.target)) closeAlbumMenu(false)
+    })
+    window.addEventListener('resize', () => closeAlbumMenu(false))
+    document.addEventListener('scroll', event => {
+        if (!albumMenu.contains(event.target)) closeAlbumMenu(false)
+    }, true)
+
     const renderSidebar = () => {
         const owned = document.querySelector('#owned-albums')
         const shared = document.querySelector('#shared-albums')
@@ -380,7 +473,8 @@
             button.title = album.name
             const icon = document.createElement('span')
             icon.setAttribute('aria-hidden', 'true')
-            icon.textContent = '▱'
+            icon.textContent = album.is_pinned ? '⌖' : '▱'
+            if (album.is_pinned) button.setAttribute('aria-label', `${album.name}, pinned`)
             const label = document.createElement('span')
             label.className = 'library-nav-label'
             label.textContent = album.name
@@ -393,8 +487,40 @@
                 if (window.matchMedia('(max-width: 48rem)').matches) setSidebarOpen(false)
                 openAlbum(album.id)
             })
+            const row = document.createElement('div')
+            row.className = 'album-row'
+            row.dataset.albumId = album.id
+            const actions = document.createElement('button')
+            actions.type = 'button'
+            actions.className = 'album-actions'
+            actions.textContent = '⋯'
+            actions.title = `Actions for ${album.name}`
+            actions.setAttribute('aria-label', `Actions for ${album.name}`)
+            actions.setAttribute('aria-haspopup', 'menu')
+            actions.setAttribute('aria-expanded', 'false')
+            actions.setAttribute('aria-controls', 'album-context-menu')
+            const openActions = () => {
+                const rect = actions.getBoundingClientRect()
+                openAlbumMenu(album, rect.left, rect.bottom, actions)
+            }
+            actions.addEventListener('click', openActions)
+            actions.addEventListener('keydown', event => {
+                if (event.key === 'ArrowDown') { event.preventDefault(); openActions() }
+            })
+            button.addEventListener('keydown', event => {
+                if (event.key === 'ContextMenu' || (event.shiftKey && event.key === 'F10')) {
+                    event.preventDefault()
+                    const rect = button.getBoundingClientRect()
+                    openAlbumMenu(album, rect.left, rect.bottom, button)
+                }
+            })
+            row.addEventListener('contextmenu', event => {
+                event.preventDefault()
+                openAlbumMenu(album, event.clientX, event.clientY, actions)
+            })
+            row.append(button, actions)
             const isOwned = album.owner === window.cdnAuthUser?.id
-            ;(isOwned ? owned : shared).append(button)
+            ;(isOwned ? owned : shared).append(row)
             if (!isOwned && sharedSection) sharedSection.hidden = false
             albumTarget.add(new Option(album.name, album.id))
         }
@@ -568,15 +694,26 @@
         } catch (error) { showError(error.message) }
     }
 
-    const dialogForm = (heading, fields, onSubmit) => {
+    const dialogForm = (heading, fields, onSubmit, options = {}) => {
+        const returnTarget = document.activeElement
+        const returnAlbumId = options.albumId || returnTarget?.closest('[data-album-id]')?.dataset.albumId
+        dialog.addEventListener('close', () => {
+            const replacement = returnAlbumId
+                ? document.querySelector(`[data-album-id="${CSS.escape(returnAlbumId)}"] .album-actions`) : null
+            const target = replacement || (returnTarget?.isConnected ? returnTarget : document.querySelector('#create-album'))
+            target?.focus()
+        }, { once: true })
         dialog.replaceChildren()
         const form = document.createElement('form')
         const titleNode = document.createElement('h2')
         titleNode.textContent = heading
+        titleNode.id = 'album-dialog-title'
+        dialog.setAttribute('aria-labelledby', titleNode.id)
         form.append(titleNode)
         for (const field of fields) form.append(field)
         const error = document.createElement('p')
-        error.className = 'muted'
+        error.className = 'muted dialog-status'
+        error.setAttribute('role', 'status')
         error.hidden = true
         const actions = document.createElement('div')
         actions.className = 'dialog-actions'
@@ -586,18 +723,24 @@
         cancel.addEventListener('click', () => dialog.close())
         const submit = document.createElement('button')
         submit.type = 'submit'
-        submit.className = 'primary'
-        submit.textContent = 'Save'
+        submit.className = options.destructive ? 'danger' : 'primary'
+        submit.textContent = options.submitText || 'Save'
         actions.append(cancel, submit)
         form.append(error, actions)
         form.addEventListener('submit', async event => {
             event.preventDefault()
             submit.disabled = true
-            try { await onSubmit(form); dialog.close() } catch (cause) { error.textContent = cause.message; error.hidden = false }
+            error.hidden = true
+            try { if (await onSubmit(form) !== false) dialog.close() } catch (cause) {
+                error.textContent = cause.message
+                error.setAttribute('role', 'alert')
+                error.hidden = false
+            }
             finally { submit.disabled = false }
         })
         dialog.append(form)
         dialog.showModal()
+        if (options.destructive) cancel.focus()
     }
     const field = (labelText, name, type = 'text') => {
         const label = document.createElement('label')
@@ -634,13 +777,59 @@
         updateSelection()
         if (state.activeAlbum?.id === id) await openAlbum(id)
     })
-    manageButton?.addEventListener('click', () => {
-        const album = state.activeAlbum
-        if (!album || album.role !== 'owner') return
+    const renameAlbum = album => {
         const name = field('Album name', 'name')
         name.querySelector('input').value = album.name
+        name.querySelector('input').maxLength = 120
+        dialogForm(`Rename “${album.name}”`, [name], async form => {
+            const updated = await api(`/api/albums/${encodeURIComponent(album.id)}`, {
+                method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ name: form.elements.name.value }),
+            })
+            if (state.activeAlbum?.id === album.id) {
+                state.activeAlbum.name = updated.name
+                title.textContent = updated.name
+            }
+            await loadAlbums()
+            showAlbumStatus('Album renamed.')
+        })
+        name.querySelector('input').select()
+    }
+    const confirmAlbumDeletion = album => {
+        const description = document.createElement('p')
+        description.textContent = `Delete “${album.name}”? Its photos will stay in your library. Shared access to this album will end.`
+        dialogForm('Delete album', [description], async () => {
+            await api(`/api/albums/${encodeURIComponent(album.id)}`, { method: 'DELETE' })
+            state.albums = state.albums.filter(item => item.id !== album.id)
+            renderSidebar()
+            if (state.activeAlbum?.id === album.id) {
+                state.activeAlbum = null
+                state.view = 'library'
+                state.selected.clear()
+                title.textContent = 'Library'
+                manageButton.hidden = true
+                const [files, months] = await Promise.all([
+                    api(withFilters(`/api/files/user/${encodeURIComponent(window.cdnAuthUser.id)}?limit=100&offset=0`)),
+                    api(withSearch(`/api/files/user/${encodeURIComponent(window.cdnAuthUser.id)}/timeline`)),
+                ])
+                state.allFiles = files
+                state.files = files
+                state.months = months
+                state.offset = files.length
+                updateUserLoadMore()
+                renderFiles()
+            }
+            showAlbumStatus('Album deleted. Its photos remain in your library.')
+        }, { submitText: 'Delete album', destructive: true, albumId: album.id })
+    }
+    const shareAlbum = async id => {
+        const album = await api(`/api/albums/${encodeURIComponent(id)}?limit=1`)
+        if (album.role !== 'owner') throw Error('Only the album owner can change sharing.')
+        const description = document.createElement('p')
+        description.textContent = `Share “${album.name}” with a Hanasand account, or enable a public link.`
         const invite = field('Hanasand account ID', 'userId')
         invite.querySelector('input').required = false
+        invite.querySelector('input').maxLength = 80
         const role = document.createElement('label')
         role.append(document.createTextNode('Access'))
         const select = document.createElement('select')
@@ -654,78 +843,98 @@
         toggle.name = 'isPublic'
         toggle.checked = album.is_public
         share.append(toggle, document.createTextNode(' Allow anyone with a link to view'))
-        const members = document.createElement('div')
-        for (const member of album.members || []) {
-            const row = document.createElement('p')
-            row.textContent = `${member.user_id} · ${member.role} `
-            const remove = document.createElement('button')
-            remove.type = 'button'
-            remove.className = 'danger'
-            remove.textContent = 'Remove'
-            remove.addEventListener('click', async () => {
-                await api(
-                    `/api/albums/${encodeURIComponent(album.id)}/members/${encodeURIComponent(member.user_id)}`,
-                    { method: 'DELETE' },
-                )
-                row.remove()
-            })
-            row.append(remove)
-            members.append(row)
-        }
-        const deleteAlbum = document.createElement('button')
-        deleteAlbum.type = 'button'
-        deleteAlbum.className = 'danger'
-        deleteAlbum.textContent = 'Delete album'
-        deleteAlbum.addEventListener('click', async () => {
-            if (!window.confirm(`Delete “${album.name}”? The uploaded photos will stay in your library.`)) return
+        const linkWarning = document.createElement('p')
+        linkWarning.className = 'muted'
+        linkWarning.textContent = 'Removing someone’s account access does not block a public link. '
+            + 'Turn off public sharing to disable the link.'
+        const linkRow = document.createElement('div')
+        const linkLabel = field('Public link', 'publicLink')
+        const linkInput = linkLabel.querySelector('input')
+        linkInput.required = false
+        linkInput.readOnly = true
+        const copy = document.createElement('button')
+        copy.type = 'button'
+        copy.textContent = 'Copy link'
+        copy.addEventListener('click', async () => {
             try {
-                await api(`/api/albums/${encodeURIComponent(album.id)}`, { method: 'DELETE' })
-                state.albums = state.albums.filter(item => item.id !== album.id)
-                state.activeAlbum = null
-                state.view = 'library'
-                title.textContent = 'Library'
-                manageButton.hidden = true
-                const [files, months] = await Promise.all([
-                    api(withFilters(`/api/files/user/${encodeURIComponent(window.cdnAuthUser.id)}?limit=100&offset=0`)),
-                    api(withSearch(`/api/files/user/${encodeURIComponent(window.cdnAuthUser.id)}/timeline`)),
-                ])
-                state.allFiles = files
-                state.files = files
-                state.months = months
-                state.offset = files.length
-                updateUserLoadMore()
-                dialog.close()
-                renderSidebar()
-                renderFiles()
-            } catch (error) {
-                const status = dialog.querySelector('form p')
-                status.textContent = error.message
-                status.hidden = false
+                if (!navigator.clipboard) throw Error('Clipboard unavailable')
+                await navigator.clipboard.writeText(linkInput.value)
+                copy.textContent = 'Copied'
+            } catch {
+                linkInput.focus()
+                linkInput.select()
+                copy.textContent = 'Select and copy the link'
             }
         })
-        const fields = [name, invite, role, share, members, deleteAlbum]
-        dialogForm('Album sharing', fields, async form => {
-            const newName = form.elements.name.value
-            const isPublicNow = form.elements.isPublic.checked
-            const updated = await api(`/api/albums/${encodeURIComponent(album.id)}`, {
+        linkRow.append(linkLabel, copy)
+        const updateLink = () => {
+            linkRow.hidden = !album.is_public || !album.public_token
+            linkInput.value = linkRow.hidden ? '' : `${location.origin}/shared/${encodeURIComponent(album.public_token)}`
+            copy.textContent = 'Copy link'
+        }
+        updateLink()
+        const members = document.createElement('div')
+        const renderMembers = () => {
+            members.replaceChildren()
+            for (const member of album.members || []) {
+                const row = document.createElement('p')
+                row.textContent = `${member.user_id} · ${member.role === 'contributor' ? 'Can add photos' : 'Can view'} `
+                const remove = document.createElement('button')
+                remove.type = 'button'
+                remove.className = 'danger'
+                remove.textContent = 'Remove access'
+                remove.setAttribute('aria-label', `Remove access for ${member.user_id}`)
+                remove.addEventListener('click', async () => {
+                    remove.disabled = true
+                    try {
+                        await api(`/api/albums/${encodeURIComponent(id)}/members/${encodeURIComponent(member.user_id)}`, {
+                            method: 'DELETE',
+                        })
+                        album.members = album.members.filter(item => item.user_id !== member.user_id)
+                        renderMembers()
+                        invite.querySelector('input').focus()
+                    } catch (error) {
+                        const status = dialog.querySelector('.dialog-status')
+                        status.textContent = error.message
+                        status.hidden = false
+                        status.setAttribute('role', 'alert')
+                        remove.disabled = false
+                    }
+                })
+                row.append(remove)
+                members.append(row)
+            }
+        }
+        renderMembers()
+        dialogForm('Share album', [description, invite, role, share, linkWarning, linkRow, members], async form => {
+            const updated = await api(`/api/albums/${encodeURIComponent(id)}`, {
                 method: 'PATCH', headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ name: newName, isPublic: isPublicNow }),
+                body: JSON.stringify({ isPublic: form.elements.isPublic.checked }),
             })
-            if (form.elements.userId.value.trim()) await api(`/api/albums/${encodeURIComponent(album.id)}/members`, {
-                method: 'POST', headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ userId: form.elements.userId.value.trim(), role: form.elements.role.value }),
-            })
-            state.activeAlbum.name = updated.name
-            state.activeAlbum.is_public = updated.is_public
-            state.activeAlbum.members = album.members
-            if (updated.public_token) {
-                const shareUrl = `${location.origin}/shared/${encodeURIComponent(updated.public_token)}`
-                try { await navigator.clipboard.writeText(shareUrl) } catch { /* The link remains available in the next prompt. */ }
-                window.alert(`Public album link:\n${shareUrl}`)
+            Object.assign(album, updated)
+            updateLink()
+            const userId = form.elements.userId.value.trim()
+            if (userId) {
+                const member = await api(`/api/albums/${encodeURIComponent(id)}/members`, {
+                    method: 'POST', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ userId, role: form.elements.role.value }),
+                })
+                album.members = [...(album.members || []).filter(item => item.user_id !== userId), member]
+                form.elements.userId.value = ''
+                renderMembers()
             }
+            if (state.activeAlbum?.id === id) Object.assign(state.activeAlbum, album)
             await loadAlbums()
-            title.textContent = updated.name
-        })
+            const status = form.querySelector('.dialog-status')
+            status.textContent = 'Sharing settings saved.'
+            status.setAttribute('role', 'status')
+            status.hidden = false
+            return false
+        }, { submitText: 'Save sharing', albumId: id })
+    }
+    manageButton?.addEventListener('click', () => {
+        if (state.activeAlbum?.role === 'owner') shareAlbum(state.activeAlbum.id)
+            .catch(error => showAlbumStatus(error.message, true))
     })
     document.querySelectorAll('.library-nav').forEach(button => button.addEventListener('click', async () => {
         if (window.matchMedia('(max-width: 48rem)').matches) setSidebarOpen(false)

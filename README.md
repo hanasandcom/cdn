@@ -32,7 +32,9 @@ The signed-in gallery provides all photos, recent uploads, favorites, images, an
 
 Large images get a stored 480 × 480 WebP thumbnail for the gallery grid; the original remains available for the full-size viewer and download. Existing images get thumbnails the first time the gallery requests them. Thumbnail requests use the same private-album access checks as original files.
 
-Album operations are available under `GET/POST /api/albums`, `GET/PATCH/DELETE /api/albums/:id`, `POST /api/albums/:id/items`, `DELETE /api/albums/:id/items/:fileId`, `POST /api/albums/:id/members`, and `DELETE /api/albums/:id/members/:userId`. `GET /api/albums/public/:token` serves read-only public album contents. Existing databases gain the album and photo metadata tables/columns at service startup.
+Right-click an album or use its **Actions** (⋯) button to open, rename, pin, share, or delete it. Keyboard users can open the menu with Shift+F10, or focus Actions and press Enter. Pins belong to your account and stay at the top of each album list across devices. Shared-album members can open and pin; renaming, deleting, and changing sharing are reserved for the owner. Deleting an album keeps its photos in the library and asks for confirmation. Sharing supports a Hanasand account ID with view or contribute access, plus an optional public link that can be copied or disabled.
+
+Album operations are available under `GET/POST /api/albums`, `GET/PATCH/DELETE /api/albums/:id`, `PUT /api/albums/:id/pin` with `{ "isPinned": true }` (or `false`), `POST /api/albums/:id/items`, `DELETE /api/albums/:id/items/:fileId`, `POST /api/albums/:id/members`, and `DELETE /api/albums/:id/members/:userId`. `GET /api/albums/public/:token` serves read-only public album contents. Existing databases gain the album and photo metadata tables/columns at service startup.
 
 ## Development
 

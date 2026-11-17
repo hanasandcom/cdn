@@ -55,7 +55,7 @@ import getProjects from './handlers/project/getProjects.ts'
 import getInstall from './handlers/index/install.ts'
 import {
     addAlbumItems, addAlbumMember, createAlbum, deleteAlbum, getAlbum, getPublicAlbum,
-    listAlbums, removeAlbumItem, removeAlbumMember, updateAlbum,
+    listAlbums, pinAlbum, removeAlbumItem, removeAlbumMember, updateAlbum,
 } from './handlers/albums.ts'
 
 export default async function apiRoutes(fastify: FastifyInstance) {
@@ -84,6 +84,7 @@ export default async function apiRoutes(fastify: FastifyInstance) {
     fastify.get('/albums/:id', getAlbum)
     fastify.patch('/albums/:id', updateAlbum)
     fastify.delete('/albums/:id', deleteAlbum)
+    fastify.put('/albums/:id/pin', pinAlbum)
     fastify.post('/albums/:id/items', addAlbumItems)
     fastify.delete('/albums/:id/items/:fileId', removeAlbumItem)
     fastify.post('/albums/:id/members', addAlbumMember)

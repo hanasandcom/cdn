@@ -5,7 +5,7 @@ import { getSessionUserId } from '#utils/auth/session.ts'
 
 type AlbumParams = { id: string, fileId?: string, userId?: string, token?: string }
 type AlbumQuery = { limit?: string, offset?: string, search?: string, month?: string }
-type AlbumBody = { name?: unknown, isPublic?: unknown, userId?: unknown, role?: unknown, fileIds?: unknown }
+type AlbumBody = { name?: unknown, isPublic?: unknown, isPinned?: unknown, userId?: unknown, role?: unknown, fileIds?: unknown }
 
 async function signedIn(req: FastifyRequest, res: FastifyReply) {
     const userId = await getSessionUserId(req)
@@ -76,14 +76,45 @@ export async function listAlbums(req: FastifyRequest, res: FastifyReply) {
         COUNT(i.file_id)::int AS photo_count,
         (SELECT f.id FROM photo_album_items pi JOIN files f ON f.id=pi.file_id
         WHERE pi.album_id=a.id ORDER BY pi.added_at DESC LIMIT 1) AS cover_file_id,
-        CASE WHEN a.owner=$1 THEN 'owner' ELSE m.role END AS member_role
+        CASE WHEN a.owner=$1 THEN 'owner' ELSE m.role END AS member_role,
+        p.album_id IS NOT NULL AS is_pinned
         FROM photo_albums a
         LEFT JOIN photo_album_members m ON m.album_id=a.id AND m.user_id=$1
+        LEFT JOIN photo_album_pins p ON p.album_id=a.id AND p.user_id=$1
         LEFT JOIN photo_album_items i ON i.album_id=a.id
         WHERE a.owner=$1 OR m.user_id=$1
-        GROUP BY a.id,a.name,a.owner,a.public_token,a.created_at,a.updated_at,m.role
-        ORDER BY a.updated_at DESC,a.id`, [userId])
+        GROUP BY a.id,a.name,a.owner,a.public_token,a.created_at,a.updated_at,m.role,p.album_id
+        ORDER BY is_pinned DESC,a.updated_at DESC,a.id`, [userId])
     return res.send(result.rows)
+}
+
+export async function pinAlbum(req: FastifyRequest<{ Params: AlbumParams }>, res: FastifyReply) {
+    res.header('Cache-Control', 'private, no-store')
+    if (rejectCrossOriginMutation(req, res)) return
+    const userId = await signedIn(req, res)
+    if (!userId) return
+    const isPinned = (req.body as AlbumBody | undefined)?.isPinned
+    if (typeof isPinned !== 'boolean') return res.status(400).send({ error: 'isPinned must be a boolean.' })
+    const { id } = req.params
+    const permission = await albumPermission(id, userId)
+    if (!permission.exists || (!permission.owner && !permission.role)) {
+        return res.status(404).send({ error: 'Album not found.' })
+    }
+    if (isPinned) {
+        try {
+            await run(`INSERT INTO photo_album_pins (user_id,album_id) VALUES ($1,$2)
+                ON CONFLICT (user_id,album_id) DO NOTHING`, [userId, id])
+        } catch (error) {
+            const databaseError = error as { code?: string, constraint?: string } | null
+            if (databaseError?.code === '23503' && databaseError.constraint === 'photo_album_pins_album_id_fkey') {
+                return res.status(404).send({ error: 'Album not found.' })
+            }
+            throw error
+        }
+    } else {
+        await run('DELETE FROM photo_album_pins WHERE user_id=$1 AND album_id=$2', [userId, id])
+    }
+    return res.send({ id, is_pinned: isPinned })
 }
 
 export async function createAlbum(req: FastifyRequest, res: FastifyReply) {
@@ -105,8 +136,9 @@ export async function getAlbum(req: FastifyRequest<{ Params: AlbumParams, Querys
     const { id } = req.params
     const access = await albumPermission(id, userId)
     if (!access.exists || (!access.owner && !access.role)) return res.status(404).send({ error: 'Album not found.' })
-    const album = await run(`SELECT id,name,owner,public_token IS NOT NULL AS is_public,created_at,updated_at
+    const album = await run(`SELECT id,name,owner,public_token,public_token IS NOT NULL AS is_public,created_at,updated_at
         FROM photo_albums WHERE id=$1`, [id])
+    if (!album.rowCount) return res.status(404).send({ error: 'Album not found.' })
     const limit = Math.min(Math.max(Number.parseInt(req.query.limit || '100', 10) || 100, 1), 100)
     const offset = Math.max(0, Math.min(1_000_000, Number.parseInt(req.query.offset || '0', 10) || 0))
     const search = typeof req.query.search === 'string' ? req.query.search.trim().slice(0, 120) : ''
@@ -139,7 +171,9 @@ export async function getAlbum(req: FastifyRequest<{ Params: AlbumParams, Querys
     const members = access.owner
         ? await run('SELECT user_id,role,added_at FROM photo_album_members WHERE album_id=$1 ORDER BY user_id', [id])
         : null
-    return res.send({ ...album.rows[0], role: access.owner ? 'owner' : access.role,
+    const { public_token: publicToken, ...albumDetails } = album.rows[0]
+    return res.send({ ...albumDetails, ...(access.owner ? { public_token: publicToken } : {}),
+        role: access.owner ? 'owner' : access.role,
         items: items.rows, total: total.rows[0].total, limit, offset,
         timeline: timeline.rows, month, members: members?.rows })
 }

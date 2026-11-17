@@ -84,6 +84,13 @@ export default async function ensureSchema() {
                 PRIMARY KEY (album_id, user_id)
             );
 
+            CREATE TABLE IF NOT EXISTS photo_album_pins (
+                user_id TEXT NOT NULL,
+                album_id TEXT NOT NULL REFERENCES photo_albums(id) ON DELETE CASCADE,
+                pinned_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                PRIMARY KEY (user_id, album_id)
+            );
+
             CREATE TABLE IF NOT EXISTS photo_album_items (
                 album_id TEXT NOT NULL REFERENCES photo_albums(id) ON DELETE CASCADE,
                 file_id TEXT NOT NULL REFERENCES files(id) ON DELETE CASCADE,
@@ -98,6 +105,8 @@ export default async function ensureSchema() {
             ON photo_album_members(user_id, album_id);
             CREATE INDEX IF NOT EXISTS idx_photo_album_items_album_added
             ON photo_album_items(album_id, added_at DESC);
+            CREATE INDEX IF NOT EXISTS idx_photo_album_pins_album
+            ON photo_album_pins(album_id);
             CREATE INDEX IF NOT EXISTS idx_files_owner_taken
             ON files(owner, photo_taken_at DESC);
 

@@ -273,7 +273,42 @@ hanasand-upload-picker:defined > .picker-fallback { display: none; }
 .library-nav:hover, .library-nav[aria-current="page"], .album-nav:hover,
 .album-nav[aria-current="page"] { border-radius: .6rem; background: #292929; color: #fff; }
 .library-nav .count, .album-nav .count { margin-left: auto; color: #999; font-size: .75rem; }
-.library-nav-label { min-width: 0; }
+.library-nav-label { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.album-row { display: flex; align-items: center; min-width: 0; }
+.album-row .album-nav { flex: 1; min-width: 0; font-size: .82rem; font-weight: 400; }
+.album-actions {
+    flex: 0 0 2rem; width: 2rem; min-height: 2.5rem; padding: 0; border: 0;
+    border-radius: .5rem; background: transparent; color: #aaa; font-size: 1.25rem;
+}
+.album-actions:hover, .album-actions[aria-expanded="true"] { background: #292929; color: #fff; }
+.album-context-menu {
+    position: fixed; z-index: 200; display: grid; min-width: 12rem; max-width: calc(100vw - 16px);
+    max-height: calc(100dvh - 16px); overflow-y: auto; padding: .35rem;
+    border: 1px solid #484848; border-radius: .7rem; background: #191919; color: #eee;
+    box-shadow: 0 8px 30px #0007;
+}
+.album-context-menu[hidden] { display: none; }
+.album-context-menu button {
+    border: 0; border-radius: .4rem; padding: .65rem .85rem; min-height: 2.5rem;
+    background: transparent; color: inherit; text-align: left; font: inherit; font-size: .9rem;
+}
+.album-context-menu button:hover, .album-context-menu button:focus { background: #333; outline: none; }
+.album-context-menu .danger { color: #ff9e9e; }
+.album-context-menu [role="separator"] { height: 1px; margin: .3rem; background: #444; }
+.album-status { margin: 0 0 1rem; font-size: .85rem; color: #bbb; }
+.album-status[role="alert"] { color: #ff9e9e; }
+.photo-library-layout.sidebar-collapsed .album-row { flex-direction: column; }
+.photo-library-layout.sidebar-collapsed .album-actions { min-height: 1.5rem; flex-basis: auto; }
+@media (pointer: coarse) {
+    .album-actions { min-width: 44px; min-height: 44px; }
+    .album-context-menu button { min-height: 44px; }
+}
+:root[data-theme="light"] .album-context-menu { background: #fff; color: #202124; border-color: #ccc; }
+:root[data-theme="light"] .album-context-menu button:hover,
+:root[data-theme="light"] .album-context-menu button:focus,
+:root[data-theme="light"] .album-actions:hover { background: #e9edf2; color: #202124; }
+:root[data-theme="light"] .album-context-menu .danger,
+:root[data-theme="light"] .album-status[role="alert"] { color: #a52020; }
 .new-album {
     width: 100%; margin-top: .3rem; border: 1px solid #383838;
     background: #191919; color: #eee; padding: .55rem; font-size: .8rem;
@@ -633,10 +668,11 @@ aria-expanded="true" aria-label="Collapse sidebar" title="Collapse sidebar">
 <div id="selection-actions" class="selection-actions" hidden>
 <select id="album-target" aria-label="Choose an album"><option value="">Add to album</option></select>
 <button id="add-to-album" type="button" disabled>Add selected</button>
-<button id="manage-album" type="button" hidden>Share</button>
 </div>
+<button id="manage-album" type="button" hidden>Share</button>
 <button id="load-more" type="button" hidden>Load more</button>
 </div></div>
+<p id="album-status" class="album-status" role="status" hidden></p>
 <div id="date-timeline" class="date-timeline" aria-label="Browse by date" hidden></div>
 <div id="files" class="library-grid" aria-live="polite" aria-busy="true">
 <span class="loading-indicator" role="status" aria-label="Loading photos"></span></div>
