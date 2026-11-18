@@ -617,7 +617,22 @@
         updateSelection()
     }
 
-    const renderFiles = () => {
+    const oldestFirst = () => !isPublic && state.view === 'library'
+    const renderFiles = ({ newest = false, preservePosition = false } = {}) => {
+        const chronological = oldestFirst()
+        const anchor = chronological && preservePosition
+            ? [...root.querySelectorAll('.photo-card')].find(card => {
+                const rect = card.getBoundingClientRect()
+                return rect.bottom > 0 && rect.top < window.innerHeight
+            }) : null
+        const anchorId = anchor?.dataset.fileId
+        const anchorTop = anchor?.getBoundingClientRect().top
+        if (chronological && preservePosition) updateUserLoadMore()
+        root.style.overflowAnchor = chronological ? 'none' : ''
+        const sentinel = document.querySelector('#scroll-sentinel')
+        if (chronological) root.before(loadMore, sentinel)
+        else root.after(loadMore, sentinel)
+        loadMore.textContent = chronological ? 'Load older photos' : 'Load more'
         videoPreviewObserver.disconnect()
         if (state.view === 'trash') { renderTrash(); return }
         root.setAttribute('aria-busy', 'false')
@@ -625,7 +640,10 @@
         root.replaceChildren()
         const filtered = state.files.filter(file => /^image\/(jpeg|png|gif|webp|avif|heic|heif)$/i.test(file.type)
             || /^video\/(mp4|webm|ogg|quicktime)$/i.test(file.type))
-            .sort((a, b) => new Date(b.photo_taken_at || b.uploaded_at) - new Date(a.photo_taken_at || a.uploaded_at))
+            .sort((a, b) => chronological
+                ? new Date(a.photo_taken_at || a.uploaded_at) - new Date(b.photo_taken_at || b.uploaded_at)
+                    || (a.id === b.id ? 0 : a.id < b.id ? -1 : 1)
+                : new Date(b.photo_taken_at || b.uploaded_at) - new Date(a.photo_taken_at || a.uploaded_at))
         state.photos = filtered
         renderTimeline(filtered)
         if (!filtered.length) {
@@ -640,11 +658,12 @@
             root.append(empty)
             return
         }
-        const groups = new Map()
+        const groups = []
         for (const file of filtered) {
-            const key = `${groupDate(file)}\u0000${locationLabel(file)}`
-            if (!groups.has(key)) groups.set(key, [])
-            groups.get(key).push(file)
+            const key = `${groupDate(file)}\u0000${chronological ? '' : locationLabel(file)}`
+            // Keep adjacent groups together without moving a later visit to a place backward in time.
+            if (groups.at(-1)?.[0] !== key) groups.push([key, []])
+            groups.at(-1)[1].push(file)
         }
         let firstImage = true
         for (const [key, files] of groups) {
@@ -667,6 +686,7 @@
             for (const file of files) {
                 const card = document.createElement('article')
                 card.className = 'photo-card'
+                card.dataset.fileId = file.id
                 const open = document.createElement('button')
                 open.type = 'button'
                 open.className = 'photo-open'
@@ -785,6 +805,12 @@
             }
             section.append(heading, grid)
             root.append(section)
+        }
+        if (chronological && newest) {
+            window.scrollTo({ top: document.documentElement.scrollHeight, behavior: 'instant' })
+        } else if (anchorId) {
+            const replacement = root.querySelector(`[data-file-id="${CSS.escape(anchorId)}"]`)
+            if (replacement) window.scrollBy({ top: replacement.getBoundingClientRect().top - anchorTop, behavior: 'instant' })
         }
     }
 
@@ -1145,7 +1171,7 @@
             state.months = months
             state.files = files
             updateUserLoadMore()
-            renderFiles()
+            renderFiles({ newest: true })
         } catch (error) {
             if (request === state.searchRequest) showError(error.message)
         }
@@ -1216,14 +1242,16 @@
                 state.months = months
                 updateUserLoadMore()
             }
-            if (request === state.searchRequest) renderFiles()
+            if (request === state.searchRequest) renderFiles({ newest: true })
         } catch (error) {
             if (request === state.searchRequest) showError(error.message)
         }
     }
     loadMore?.addEventListener('click', () => loadMoreFiles().catch(error => { loadMore.textContent = error.message }))
     const moreObserver = new IntersectionObserver(entries => {
-        if (entries.some(entry => entry.isIntersecting) && !loadMore.hidden && !loadMore.disabled) {
+        const bounds = document.querySelector('#scroll-sentinel')?.getBoundingClientRect()
+        if (entries.some(entry => entry.isIntersecting) && bounds?.top < window.innerHeight + 600
+            && bounds.bottom > -600 && root.getAttribute('aria-busy') !== 'true' && !loadMore.hidden && !loadMore.disabled) {
             loadMoreFiles().catch(error => { loadMore.textContent = error.message })
         }
     }, { rootMargin: '600px' })
@@ -1307,8 +1335,8 @@
             state.offset += next.length
             state.allFiles.push(...next)
             state.files = state.allFiles
-            updateUserLoadMore()
-            renderFiles()
+            if (!oldestFirst()) updateUserLoadMore()
+            renderFiles({ preservePosition: true })
         } finally { loadMore.disabled = false }
     }
     if (isPublic) {
@@ -1339,7 +1367,7 @@
             state.months = months
             state.offset = files.length
             updateUserLoadMore()
-            renderFiles()
+            renderFiles({ newest: true })
         }).catch(error => showError(error.message || 'The photo library could not be loaded.'))
     }
 })()
