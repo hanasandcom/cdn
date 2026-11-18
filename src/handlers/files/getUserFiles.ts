@@ -63,7 +63,7 @@ export default async function getUserFiles(
                     photo_taken_at, photo_taken_offset_minutes, location_label, latitude, longitude, is_favorite,
                     COALESCE(storage_size,octet_length(data)) AS size_bytes
              FROM files
-             WHERE owner = $1
+             WHERE owner = $1 AND deleted_at IS NULL
                AND ($4 = '' OR strpos(lower(name),lower($4)) > 0
                     OR strpos(lower(concat_ws(' ',location_label,latitude::text,longitude::text)),lower($4)) > 0)
                AND ($5 = '' OR TO_CHAR(

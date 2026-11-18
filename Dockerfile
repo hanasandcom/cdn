@@ -2,7 +2,7 @@
 FROM oven/bun:alpine
 
 # Install dependencies
-RUN apk add --no-cache varnish
+RUN apk add --no-cache varnish ffmpeg
 
 # Sets the working directory
 WORKDIR /usr/src/app

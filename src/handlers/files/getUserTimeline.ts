@@ -40,7 +40,7 @@ export default async function getUserTimeline(
             ) AS month_key,
             COUNT(*)::int AS photo_count
             FROM files
-            WHERE owner=$1
+            WHERE owner=$1 AND deleted_at IS NULL
               AND type IN ('image/jpeg','image/png','image/gif','image/webp','image/avif','image/heic','image/heif',
                   'video/mp4','video/webm','video/ogg','video/quicktime')
               AND ($2='' OR strpos(lower(name),lower($2))>0

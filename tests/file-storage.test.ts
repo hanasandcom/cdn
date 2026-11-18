@@ -28,7 +28,9 @@ beforeAll(async () => {
         uploaded_at TIMESTAMPTZ DEFAULT NOW(),upload_key TEXT,storage_key TEXT,storage_size BIGINT,
         thumbnail_storage_key TEXT,thumbnail_size BIGINT,thumbnail_processed BOOLEAN DEFAULT FALSE,
         photo_taken_at TIMESTAMPTZ,photo_taken_offset_minutes SMALLINT,location_label TEXT,
-        latitude DOUBLE PRECISION,longitude DOUBLE PRECISION,is_favorite BOOLEAN DEFAULT FALSE
+        latitude DOUBLE PRECISION,longitude DOUBLE PRECISION,is_favorite BOOLEAN DEFAULT FALSE,
+        deleted_at TIMESTAMPTZ,restore_private BOOLEAN NOT NULL DEFAULT FALSE,purge_started_at TIMESTAMPTZ,
+        playback_storage_key TEXT,playback_size BIGINT
     )`)
     await pool.query('CREATE UNIQUE INDEX idx_test_files_owner_upload_key ON files(owner,upload_key) WHERE upload_key IS NOT NULL')
     await pool.query(`CREATE TABLE photo_albums(

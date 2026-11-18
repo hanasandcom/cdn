@@ -59,7 +59,7 @@ async function albumTimeline(albumId: string, search: string) {
             'YYYY-MM'
         ) AS month_key,
         COUNT(*)::int AS photo_count
-        FROM photo_album_items pi JOIN files f ON f.id=pi.file_id
+        FROM photo_album_items pi JOIN files f ON f.id=pi.file_id AND f.deleted_at IS NULL
         WHERE pi.album_id=$1
           AND (f.type IN ('image/jpeg','image/png','image/gif','image/webp','image/avif','image/heic','image/heif',
               'video/mp4','video/webm','video/ogg','video/quicktime'))
@@ -73,8 +73,8 @@ export async function listAlbums(req: FastifyRequest, res: FastifyReply) {
     const userId = await signedIn(req, res)
     if (!userId) return
     const result = await run(`SELECT a.id,a.name,a.owner,a.public_token IS NOT NULL AS is_public,a.created_at,a.updated_at,
-        COUNT(i.file_id)::int AS photo_count,
-        (SELECT f.id FROM photo_album_items pi JOIN files f ON f.id=pi.file_id
+        COUNT(album_file.id)::int AS photo_count,
+        (SELECT f.id FROM photo_album_items pi JOIN files f ON f.id=pi.file_id AND f.deleted_at IS NULL
         WHERE pi.album_id=a.id ORDER BY pi.added_at DESC LIMIT 1) AS cover_file_id,
         CASE WHEN a.owner=$1 THEN 'owner' ELSE m.role END AS member_role,
         p.album_id IS NOT NULL AS is_pinned
@@ -82,6 +82,7 @@ export async function listAlbums(req: FastifyRequest, res: FastifyReply) {
         LEFT JOIN photo_album_members m ON m.album_id=a.id AND m.user_id=$1
         LEFT JOIN photo_album_pins p ON p.album_id=a.id AND p.user_id=$1
         LEFT JOIN photo_album_items i ON i.album_id=a.id
+        LEFT JOIN files album_file ON album_file.id=i.file_id AND album_file.deleted_at IS NULL
         WHERE a.owner=$1 OR m.user_id=$1
         GROUP BY a.id,a.name,a.owner,a.public_token,a.created_at,a.updated_at,m.role,p.album_id
         ORDER BY is_pinned DESC,a.updated_at DESC,a.id`, [userId])
@@ -147,7 +148,7 @@ export async function getAlbum(req: FastifyRequest<{ Params: AlbumParams, Querys
     const [items, total] = await Promise.all([run(`SELECT f.id,f.name,f.type,f.owner,f.is_favorite,f.uploaded_at,f.photo_taken_at,
         f.photo_taken_offset_minutes,f.location_label,f.latitude,f.longitude,
         COALESCE(f.storage_size,octet_length(f.data)) AS size_bytes, pi.added_at, pi.added_by
-        FROM photo_album_items pi JOIN files f ON f.id=pi.file_id
+        FROM photo_album_items pi JOIN files f ON f.id=pi.file_id AND f.deleted_at IS NULL
         WHERE pi.album_id=$1 AND f.type IN ('image/jpeg','image/png','image/gif','image/webp','image/avif','image/heic','image/heif',
             'video/mp4','video/webm','video/ogg','video/quicktime')
           AND ($4='' OR strpos(lower(f.name),lower($4))>0
@@ -158,7 +159,7 @@ export async function getAlbum(req: FastifyRequest<{ Params: AlbumParams, Querys
                 ELSE f.uploaded_at AT TIME ZONE 'UTC' END,'YYYY-MM')=$5)
         ORDER BY COALESCE(f.photo_taken_at,f.uploaded_at) DESC,f.id LIMIT $2 OFFSET $3`,
     [id, limit, offset, search, month]),
-    run(`SELECT COUNT(*)::int AS total FROM photo_album_items pi JOIN files f ON f.id=pi.file_id
+    run(`SELECT COUNT(*)::int AS total FROM photo_album_items pi JOIN files f ON f.id=pi.file_id AND f.deleted_at IS NULL
         WHERE pi.album_id=$1 AND f.type IN ('image/jpeg','image/png','image/gif','image/webp','image/avif','image/heic','image/heif',
             'video/mp4','video/webm','video/ogg','video/quicktime')
           AND ($2='' OR strpos(lower(f.name),lower($2))>0
@@ -225,7 +226,7 @@ export async function addAlbumItems(req: FastifyRequest<{ Params: AlbumParams }>
         return res.status(404).send({ error: 'Album not found.' })
     }
     const result = await run(`INSERT INTO photo_album_items (album_id,file_id,added_by)
-        SELECT $1,f.id,$2 FROM files f WHERE f.owner=$2 AND f.id=ANY($3::text[])
+        SELECT $1,f.id,$2 FROM files f WHERE f.owner=$2 AND f.id=ANY($3::text[]) AND f.deleted_at IS NULL
         ON CONFLICT (album_id,file_id) DO NOTHING RETURNING file_id`, [req.params.id, userId, [...new Set(fileIds as string[])]])
     await run('UPDATE photo_albums SET updated_at=NOW() WHERE id=$1', [req.params.id])
     return res.send({ added: result.rowCount, requested: new Set(fileIds).size })
@@ -295,7 +296,7 @@ export async function getPublicAlbum(req: FastifyRequest<{ Params: AlbumParams, 
     const [items, total] = await Promise.all([run(`SELECT f.id,f.name,f.type,f.uploaded_at,f.photo_taken_at,
         f.photo_taken_offset_minutes,f.location_label,f.latitude,f.longitude,
         COALESCE(f.storage_size,octet_length(f.data)) AS size_bytes
-        FROM photo_album_items pi JOIN files f ON f.id=pi.file_id
+        FROM photo_album_items pi JOIN files f ON f.id=pi.file_id AND f.deleted_at IS NULL
         WHERE pi.album_id=$1 AND f.type IN ('image/jpeg','image/png','image/gif','image/webp','image/avif','image/heic','image/heif',
             'video/mp4','video/webm','video/ogg','video/quicktime')
           AND ($4='' OR strpos(lower(f.name),lower($4))>0
@@ -307,7 +308,7 @@ export async function getPublicAlbum(req: FastifyRequest<{ Params: AlbumParams, 
         ORDER BY COALESCE(f.photo_taken_at,f.uploaded_at) DESC,f.id
         LIMIT $2 OFFSET $3`, [album.rows[0].id, limit, offset, search, month]),
     run(`SELECT COUNT(*)::int AS total
-        FROM photo_album_items pi JOIN files f ON f.id=pi.file_id
+        FROM photo_album_items pi JOIN files f ON f.id=pi.file_id AND f.deleted_at IS NULL
         WHERE pi.album_id=$1 AND f.type IN ('image/jpeg','image/png','image/gif','image/webp','image/avif','image/heic','image/heif',
             'video/mp4','video/webm','video/ogg','video/quicktime') AND (
             $2='' OR strpos(lower(f.name),lower($2))>0

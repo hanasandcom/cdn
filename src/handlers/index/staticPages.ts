@@ -178,6 +178,7 @@ hanasand-upload-picker:defined > .picker-fallback { display: none; }
 .file-info { padding: .75rem; overflow-wrap: anywhere; }
 .file-info p { margin: .25rem 0; }
 .muted { color: #999; }
+.gallery-page [hidden] { display: none !important; }
 .photo-viewer {
     width: min(96vw, 90rem); max-width: none; height: min(92dvh, 60rem); max-height: none;
     padding: 0; border: 1px solid #383838; border-radius: 1rem; background: #101010; color: #f6f6f3;
@@ -193,8 +194,11 @@ hanasand-upload-picker:defined > .picker-fallback { display: none; }
     min-width: 2.5rem; min-height: 2.5rem; border: 1px solid #383838;
     background: #191919; color: #f6f6f3;
 }
-.viewer-image-wrap { display: grid; min-height: 0; place-items: center; overflow: hidden; padding: 1rem; }
-.viewer-image { display: block; max-width: 100%; max-height: 100%; object-fit: contain; }
+.viewer-image-wrap { display: grid; min-width: 0; min-height: 0; grid-template: minmax(0, 1fr) / minmax(0, 1fr);
+    place-items: center; overflow: hidden; padding: .5rem; position: relative; }
+.viewer-image { display: block; width: 100%; height: 100%; min-width: 0; min-height: 0; max-width: 100%;
+    max-height: 100%; object-fit: contain; }
+.viewer-status { position: absolute; inset: auto .75rem .75rem; text-align: center; background: #111d; padding: .5rem; }
 .viewer-nav { display: flex; justify-content: space-between; padding: .5rem .75rem; }
 .viewer-info { overflow: auto; padding: 1.25rem; border-left: 1px solid #383838; }
 .viewer-info h2 { margin: .25rem 0 1rem; overflow-wrap: anywhere; font-size: 1rem; }
@@ -371,9 +375,9 @@ hanasand-upload-picker:defined > .picker-fallback { display: none; }
     transition: border-color .15s ease, box-shadow .15s ease;
 }
 .photo-card.is-selected { border-color: #70a7ff; box-shadow: 0 0 0 2px #70a7ff55; background: #163c72; }
-.photo-card > button:not(.photo-favorite) { display: block; width: 100%; height: 100%; padding: 0; border: 0; background: transparent; }
+.photo-card > .photo-open { display: block; width: 100%; height: 100%; padding: 0; border: 0; background: transparent; }
 .photo-card .preview { width: 100%; height: 100%; aspect-ratio: auto; object-fit: cover; transition: transform .18s ease; }
-.photo-card > button:hover .preview { transform: scale(1.035); }
+.photo-card > .photo-open:hover .preview { transform: scale(1.035); }
 .photo-select {
     position: absolute; z-index: 1; top: .55rem; left: .55rem;
     width: 2rem; height: 2rem; margin: 0; opacity: 0; cursor: pointer;
@@ -409,6 +413,30 @@ hanasand-upload-picker:defined > .picker-fallback { display: none; }
     width: 1.8rem; height: 1.8rem; place-items: center; border: 1px solid #383838;
     border-radius: 50%; background: #111d; color: #fff; padding: 0;
 }
+/* Keep photo actions out of the image until they are needed. */
+.photo-favorite, .photo-select-indicator, .album-remove, .photo-trash {
+    opacity: 0; pointer-events: none; transition: opacity .12s ease;
+}
+.photo-select { pointer-events: none; }
+.photo-card:hover .photo-favorite, .photo-card:focus-within .photo-favorite,
+.photo-card:hover .photo-select-indicator, .photo-card:focus-within .photo-select-indicator,
+.photo-card:hover .album-remove, .photo-card:focus-within .album-remove,
+.photo-card:hover .photo-trash, .photo-card:focus-within .photo-trash,
+.selection-mode .photo-select-indicator { opacity: 1; }
+.photo-card:hover :is(.photo-favorite, .album-remove, .photo-trash),
+.photo-card:focus-within :is(.photo-favorite, .album-remove, .photo-trash) { pointer-events: auto; }
+.photo-card:hover .photo-select, .photo-card:focus-within .photo-select,
+.selection-mode .photo-select { pointer-events: auto; }
+.photo-card .album-remove { top: auto; bottom: .35rem; left: .35rem; right: auto; }
+.photo-card .photo-trash { position: absolute; bottom: .35rem; right: .35rem; width: 2rem; height: 2rem;
+    display: grid; place-items: center; border: 1px solid #383838; border-radius: 50%; background: #111d;
+    color: #fff; padding: .3rem; }
+.photo-trash svg { width: 1.1rem; height: 1.1rem; fill: none; stroke: currentColor; stroke-width: 1.7; }
+.trash-actions { display: flex; gap: .4rem; flex-wrap: wrap; padding: .4rem; }
+.photo-card.is-trash { aspect-ratio: auto; min-height: 9rem; display: grid; align-content: space-between; }
+.trash-file-name { padding: .75rem; overflow-wrap: anywhere; font-size: .85rem; }
+#load-more { margin: 1rem auto; }
+#scroll-sentinel { height: 1px; }
 .album-dialog {
     width: min(92vw, 30rem); border: 1px solid #383838;
     border-radius: .9rem; background: #101010; color: #eee; padding: 1.25rem;
@@ -653,7 +681,9 @@ aria-expanded="true" aria-label="Collapse sidebar" title="Collapse sidebar">
 <button class="library-nav" data-view="images" aria-label="Images" title="Images">
 <span aria-hidden="true">▧</span><span class="library-nav-label">Images</span></button>
 <button class="library-nav" data-view="videos" aria-label="Videos" title="Videos">
-<span aria-hidden="true">▷</span><span class="library-nav-label">Videos</span></button></div>
+<span aria-hidden="true">▷</span><span class="library-nav-label">Videos</span></button>
+<button class="library-nav" data-view="trash" aria-label="Trash" title="Trash">
+<span aria-hidden="true">♲</span><span class="library-nav-label">Trash</span></button></div>
 <div class="library-section" id="owned-albums-section"><h2>Albums</h2><div id="owned-albums"></div>
 <button id="create-album" class="new-album" type="button" aria-label="New album" title="New album">＋ New album</button></div>
 <div class="library-section" id="shared-albums-section" hidden><h2>Shared with me</h2><div id="shared-albums"></div></div>
@@ -670,24 +700,30 @@ aria-expanded="true" aria-label="Collapse sidebar" title="Collapse sidebar">
 <option value="1">1 per row</option><option value="3">3 per row</option>
 <option value="5" selected>5 per row</option></select>
 </label>
+<button id="toggle-selection" type="button" aria-pressed="false">Select</button>
+<button id="trash-selected" type="button" hidden>Move to Trash</button>
+<button id="restore-selected" type="button" hidden>Restore</button>
+<button id="delete-selected" type="button" hidden>Delete permanently</button>
 <span id="selection-count" class="selection-count" aria-live="polite" aria-atomic="true" hidden></span>
 <div id="selection-actions" class="selection-actions" hidden>
 <select id="album-target" aria-label="Choose an album"><option value="">Add to album</option></select>
 <button id="add-to-album" type="button" disabled>Add selected</button>
 </div>
 <button id="manage-album" type="button" hidden>Share</button>
-<button id="load-more" type="button" hidden>Load more</button>
 </div></div>
 <p id="album-status" class="album-status" role="status" hidden></p>
 <div id="date-timeline" class="date-timeline" aria-label="Browse by date" hidden></div>
 <div id="files" class="library-grid" aria-live="polite" aria-busy="true">
 <span class="loading-indicator" role="status" aria-label="Loading photos"></span></div>
+<div id="scroll-sentinel" aria-hidden="true"></div>
+<button id="load-more" type="button" hidden>Load more</button>
 </section></div>
 <dialog id="photo-viewer" class="photo-viewer" aria-label="Photo viewer"><div class="viewer-layout">
 <div class="viewer-stage"><div class="viewer-toolbar"><span id="viewer-count" class="muted"></span>
 <button id="viewer-close" type="button" aria-label="Close photo">×</button></div>
 <div class="viewer-image-wrap"><img id="viewer-image" class="viewer-image" alt="">
-<video id="viewer-video" class="viewer-image" controls playsinline hidden></video></div>
+<video id="viewer-video" class="viewer-image" controls playsinline hidden></video>
+<span id="viewer-status" class="viewer-status" role="status" hidden></span></div>
 <div class="viewer-nav"><button id="viewer-prev" type="button" aria-label="Previous photo">‹</button>
 <button id="viewer-next" type="button" aria-label="Next photo">›</button></div></div>
 <aside id="viewer-info" class="viewer-info"></aside></div></dialog>
@@ -717,13 +753,15 @@ export async function getSharedAlbumPage(req: FastifyRequest, res: FastifyReply)
 <div id="date-timeline" class="date-timeline" aria-label="Browse by date" hidden></div>
 <div id="files" class="library-grid" aria-live="polite" aria-busy="true">
 <span class="loading-indicator" role="status" aria-label="Loading photos"></span></div>
+<div id="scroll-sentinel" aria-hidden="true"></div>
 <button id="load-more" type="button" hidden>Load more</button>
 </section></div>
 <dialog id="photo-viewer" class="photo-viewer" aria-label="Photo viewer"><div class="viewer-layout">
 <div class="viewer-stage"><div class="viewer-toolbar"><span id="viewer-count" class="muted"></span>
 <button id="viewer-close" type="button" aria-label="Close photo">×</button></div>
 <div class="viewer-image-wrap"><img id="viewer-image" class="viewer-image" alt="">
-<video id="viewer-video" class="viewer-image" controls playsinline hidden></video></div>
+<video id="viewer-video" class="viewer-image" controls playsinline hidden></video>
+<span id="viewer-status" class="viewer-status" role="status" hidden></span></div>
 <div class="viewer-nav"><button id="viewer-prev" type="button" aria-label="Previous photo">‹</button>
 <button id="viewer-next" type="button" aria-label="Next photo">›</button></div></div>
 <aside id="viewer-info" class="viewer-info"></aside></div></dialog>

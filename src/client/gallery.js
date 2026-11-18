@@ -1,4 +1,4 @@
-/* global CSS, window, document, location, navigator, fetch, Option, URLSearchParams, clearTimeout, setTimeout, localStorage */
+/* global CSS, window, document, location, navigator, fetch, Option, URLSearchParams, clearTimeout, setTimeout, localStorage, IntersectionObserver */
 (() => {
     const page = document.querySelector('#photo-library')
     if (!page) return
@@ -20,6 +20,11 @@
     const searchInput = document.querySelector('#photo-search')
     const densitySelect = document.querySelector('#grid-density')
     const selectionActions = document.querySelector('#selection-actions')
+    const selectionToggle = document.querySelector('#toggle-selection')
+    const trashSelected = document.querySelector('#trash-selected')
+    const restoreSelected = document.querySelector('#restore-selected')
+    const deleteSelected = document.querySelector('#delete-selected')
+    const viewerStatus = document.querySelector('#viewer-status')
     const librarySidebar = document.querySelector('#photo-library-sidebar')
     const libraryMenuToggle = document.querySelector('#library-menu-toggle')
     const librarySidebarToggle = document.querySelector('#library-sidebar-toggle')
@@ -97,7 +102,7 @@
     })
     const state = {
         files: [], allFiles: [], recentFiles: [], albums: [], activeAlbum: null,
-        view: 'library', selected: new Set(), offset: 0, recentOffset: 0,
+        view: 'library', selected: new Set(), selecting: false, offset: 0, recentOffset: 0, trashOffset: 0,
         albumOffset: 0, photos: [], photoIndex: 0, search: '', month: '', months: [], searchRequest: 0,
     }
     const fileUrl = (id, thumbnail = false) => '/api/files/' + encodeURIComponent(id)
@@ -291,10 +296,23 @@
         page.setAttribute('aria-busy', 'false')
     }
     const updateSelection = () => {
+        if (isPublic) return
         const count = state.selected.size
         selectionCount.hidden = !count
         selectionCount.textContent = count ? `${count} selected` : ''
-        if (selectionActions) selectionActions.hidden = count === 0 || state.albums.length === 0
+        page.classList.toggle('selection-mode', state.selecting || count > 0)
+        if (selectionToggle) {
+            selectionToggle.textContent = state.selecting || count ? 'Done' : 'Select'
+            selectionToggle.setAttribute('aria-pressed', String(state.selecting || count > 0))
+        }
+        if (trashSelected) {
+            trashSelected.hidden = !count || state.view === 'trash'
+            trashSelected.disabled = [...state.selected].some(id =>
+                state.files.find(file => file.id === id)?.owner !== window.cdnAuthUser?.id)
+        }
+        if (restoreSelected) restoreSelected.hidden = !count || state.view !== 'trash'
+        if (deleteSelected) deleteSelected.hidden = !count || state.view !== 'trash'
+        if (selectionActions) selectionActions.hidden = count === 0 || state.albums.length === 0 || state.view === 'trash'
         addButton.disabled = count === 0 || !albumTarget.value
     }
     const matchingPhotoCount = () => state.month
@@ -310,8 +328,63 @@
         line.textContent = `${icon} ${label}: ${value}`
         container.append(line)
     }
+    selectionToggle?.addEventListener('click', () => {
+        state.selecting = !(state.selecting || state.selected.size)
+        if (!state.selecting) state.selected.clear()
+        updateSelection()
+        renderFiles()
+    })
+    async function changeFiles(ids, action) {
+        if (!ids.length) return
+        if (action === 'permanent' && !window.confirm(`Permanently delete ${ids.length} item(s)? This cannot be undone.`)) return
+        for (const id of ids) {
+            const suffix = action === 'restore' ? '/restore' : action === 'permanent' ? '/permanent' : ''
+            await api(`/api/files/${encodeURIComponent(id)}${suffix}`, { method: action === 'restore' ? 'POST' : 'DELETE' })
+            state.selected.delete(id)
+        }
+        await searchLibrary(state.search)
+        await loadAlbums()
+        updateSelection()
+        showAlbumStatus(action === 'restore' ? 'Restored to your library.'
+            : action === 'permanent' ? 'Permanently deleted.' : 'Moved to Trash. You can restore it for 30 days.')
+    }
+    trashSelected?.addEventListener('click', () => changeFiles([...state.selected], 'trash')
+        .catch(error => showAlbumStatus(error.message, true)))
+    restoreSelected?.addEventListener('click', () => changeFiles([...state.selected], 'restore')
+        .catch(error => showAlbumStatus(error.message, true)))
+    deleteSelected?.addEventListener('click', () => changeFiles([...state.selected], 'permanent')
+        .catch(error => showAlbumStatus(error.message, true)))
+    const preparedMedia = new Set()
+    async function waitForMedia(url, stillNeeded) {
+        const deadline = Date.now() + 12 * 60 * 1000
+        while (stillNeeded()) {
+            if (preparedMedia.has(url)) return true
+            const response = await fetch(url, { method: 'HEAD', credentials: 'same-origin', cache: 'no-store' })
+            if (response.ok && response.status !== 202) { preparedMedia.add(url); return true }
+            if (response.headers.get('X-Media-State') === 'failed' || Date.now() >= deadline
+                || ![202, 429, 503].includes(response.status)) {
+                throw Error('This video could not be prepared. You can download the original.')
+            }
+            const delay = Math.max(2, Math.min(60, Number(response.headers.get('Retry-After')) || 3))
+            await new Promise(resolve => setTimeout(resolve, delay * 1000))
+        }
+        return false
+    }
+    const videoPreviewObserver = new IntersectionObserver(entries => {
+        for (const entry of entries) {
+            if (!entry.isIntersecting) continue
+            const preview = entry.target
+            videoPreviewObserver.unobserve(preview)
+            const url = preview.dataset.videoPoster
+            waitForMedia(url, () => preview.isConnected).then(ready => {
+                if (ready && preview.isConnected) preview.src = url
+            }).catch(() => { preview.alt = 'Video preview unavailable' })
+        }
+    }, { rootMargin: '300px' })
+    let viewerRequest = 0
     const openPhoto = index => {
         state.photoIndex = index
+        const request = ++viewerRequest
         const file = state.photos[index]
         const url = fileUrl(file.id)
         const isVideo = /^video\/(mp4|webm|ogg|quicktime)$/i.test(file.type)
@@ -319,9 +392,19 @@
         viewerVideo.hidden = !isVideo
         viewerVideo.pause()
         viewerVideo.removeAttribute('src')
+        viewerStatus.hidden = true
         if (isVideo) {
-            viewerVideo.src = url
-            viewerVideo.load()
+            const playback = file.type.toLowerCase() === 'video/quicktime' ? url + '?variant=playback' : url
+            viewerStatus.textContent = 'Preparing video…'
+            viewerStatus.hidden = false
+            waitForMedia(playback, () => request === viewerRequest).then(ready => {
+                if (!ready || request !== viewerRequest) return
+                viewerVideo.src = playback
+                viewerVideo.load()
+                viewerStatus.hidden = true
+            }).catch(error => {
+                if (request === viewerRequest) viewerStatus.textContent = error.message
+            })
         } else {
             viewerImage.src = url
             viewerImage.alt = file.name
@@ -351,11 +434,18 @@
     document.querySelector('#viewer-next')?.addEventListener('click', () => movePhoto(1))
     viewer?.addEventListener('click', event => { if (event.target === viewer) viewer.close() })
     viewer?.addEventListener('close', () => {
+        viewerRequest++
         viewerVideo.pause()
         viewerVideo.removeAttribute('src')
         viewerVideo.load()
     })
+    viewerVideo?.addEventListener('error', () => {
+        if (!viewer.open || viewerVideo.hidden || !viewerVideo.getAttribute('src')) return
+        viewerStatus.textContent = 'This video cannot be played here. You can download the original.'
+        viewerStatus.hidden = false
+    })
     viewer?.addEventListener('keydown', event => {
+        if (event.target === viewerVideo) return
         if (event.key === 'ArrowLeft') movePhoto(-1)
         if (event.key === 'ArrowRight') movePhoto(1)
     })
@@ -528,6 +618,8 @@
     }
 
     const renderFiles = () => {
+        videoPreviewObserver.disconnect()
+        if (state.view === 'trash') { renderTrash(); return }
         root.setAttribute('aria-busy', 'false')
         page.setAttribute('aria-busy', 'false')
         root.replaceChildren()
@@ -577,11 +669,15 @@
                 card.className = 'photo-card'
                 const open = document.createElement('button')
                 open.type = 'button'
+                open.className = 'photo-open'
                 open.setAttribute('aria-label', `View ${file.name}`)
                 const isVideo = /^video\/(mp4|webm|ogg|quicktime)$/i.test(file.type)
-                const preview = document.createElement(isVideo ? 'video' : 'img')
+                const preview = document.createElement('img')
                 preview.className = 'preview'
-                preview.src = fileUrl(file.id, !isVideo)
+                if (isVideo) {
+                    preview.dataset.videoPoster = fileUrl(file.id, true)
+                    videoPreviewObserver.observe(preview)
+                } else preview.src = fileUrl(file.id, true)
                 preview.decoding = 'async'
                 preview.loading = firstImage ? 'eager' : 'lazy'
                 if (isVideo) {
@@ -593,7 +689,14 @@
                 firstImage = false
                 open.append(preview)
                 const photoIndex = state.photos.indexOf(file)
-                open.addEventListener('click', () => openPhoto(photoIndex))
+                open.addEventListener('click', () => {
+                    if (state.selecting || state.selected.size) {
+                        if (state.selected.has(file.id)) state.selected.delete(file.id)
+                        else state.selected.add(file.id)
+                        updateSelection()
+                        renderFiles()
+                    } else openPhoto(photoIndex)
+                })
                 card.append(open)
                 if (!isPublic && file.owner === window.cdnAuthUser?.id) {
                     const favorite = document.createElement('button')
@@ -628,6 +731,15 @@
                         }
                     })
                     card.append(favorite)
+                    const trash = document.createElement('button')
+                    trash.type = 'button'
+                    trash.className = 'photo-trash'
+                    trash.setAttribute('aria-label', `Move ${file.name} to Trash`)
+                    trash.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true">'
+                        + '<path d="M4 7h16M9 7V4h6v3M6 7l1 14h10l1-14M10 10v8m4-8v8"/></svg>'
+                    trash.addEventListener('click', () => changeFiles([file.id], 'trash')
+                        .catch(error => showAlbumStatus(error.message, true)))
+                    card.append(trash)
                 }
                 if (!isPublic) {
                     const checkbox = document.createElement('input')
@@ -654,9 +766,10 @@
                         const remove = document.createElement('button')
                         remove.className = 'album-remove'
                         remove.type = 'button'
-                        remove.textContent = '×'
+                        remove.textContent = '−'
                         remove.setAttribute('aria-label', `Remove ${file.name} from album`)
                         remove.addEventListener('click', async () => {
+                            if (!window.confirm(`Remove ${file.name} from this album? The original stays in your library.`)) return
                             const albumId = encodeURIComponent(state.activeAlbum.id)
                             await api(`/api/albums/${albumId}/items/${encodeURIComponent(file.id)}`, { method: 'DELETE' })
                             state.files = state.files.filter(item => item.id !== file.id)
@@ -675,10 +788,66 @@
         }
     }
 
+    function renderTrash() {
+        root.replaceChildren()
+        root.setAttribute('aria-busy', 'false')
+        page.setAttribute('aria-busy', 'false')
+        dateTimeline.hidden = true
+        const note = document.createElement('p')
+        note.className = 'muted'
+        note.textContent = state.files.length ? 'Items in Trash are permanently deleted after 30 days.' : 'Trash is empty.'
+        root.append(note)
+        const grid = document.createElement('div')
+        grid.className = 'photo-grid'
+        for (const file of state.files) {
+            const card = document.createElement('article')
+            card.className = 'photo-card is-trash'
+            const preview = document.createElement('img')
+            preview.className = 'preview'
+            preview.loading = 'lazy'
+            preview.alt = file.name
+            preview.src = fileUrl(file.id, true) + '&trash=1'
+            preview.addEventListener('error', () => { preview.hidden = true })
+            const label = document.createElement('div')
+            label.className = 'trash-file-name'
+            label.textContent = `${file.name} · ${Math.max(0, Math.ceil((Date.parse(file.expires_at) - Date.now()) / 86400000))} days left`
+            const actions = document.createElement('div')
+            actions.className = 'trash-actions'
+            for (const [action, name] of [['restore', 'Restore'], ['permanent', 'Delete permanently']]) {
+                const button = document.createElement('button')
+                button.type = 'button'
+                button.textContent = name
+                button.addEventListener('click', () => changeFiles([file.id], action)
+                    .catch(error => showAlbumStatus(error.message, true)))
+                actions.append(button)
+            }
+            const checkbox = document.createElement('input')
+            checkbox.type = 'checkbox'
+            checkbox.className = 'photo-select'
+            checkbox.checked = state.selected.has(file.id)
+            checkbox.setAttribute('aria-label', `Select ${file.name}`)
+            const indicator = document.createElement('span')
+            indicator.className = 'photo-select-indicator'
+            indicator.setAttribute('aria-hidden', 'true')
+            checkbox.addEventListener('change', () => {
+                if (checkbox.checked) state.selected.add(file.id)
+                else state.selected.delete(file.id)
+                card.classList.toggle('is-selected', checkbox.checked)
+                updateSelection()
+            })
+            card.classList.toggle('is-selected', checkbox.checked)
+            card.append(preview, label, actions, checkbox, indicator)
+            grid.append(card)
+        }
+        root.append(grid)
+    }
     const openAlbum = async id => {
-        state.searchRequest++
+        state.month = ''
+        state.selecting = false
+        const request = ++state.searchRequest
         try {
             const album = await api(withFilters(`/api/albums/${encodeURIComponent(id)}?limit=100&offset=0`))
+            if (request !== state.searchRequest) return
             state.activeAlbum = album
             state.months = album.timeline || []
             state.view = 'album'
@@ -691,7 +860,7 @@
             renderSidebar()
             updateSelection()
             renderFiles()
-        } catch (error) { showError(error.message) }
+        } catch (error) { if (request === state.searchRequest) showError(error.message) }
     }
 
     const dialogForm = (heading, fields, onSubmit, options = {}) => {
@@ -938,12 +1107,14 @@
     })
     document.querySelectorAll('.library-nav').forEach(button => button.addEventListener('click', async () => {
         if (window.matchMedia('(max-width: 48rem)').matches) setSidebarOpen(false)
-        state.searchRequest++
+        const request = ++state.searchRequest
         state.view = button.dataset.view
+        state.month = ''
+        state.selecting = false
         state.activeAlbum = null
         state.selected.clear()
         const viewTitles = {
-            library: 'Library', recent: 'Recent', favorites: 'Favorites', images: 'Images', videos: 'Videos',
+            library: 'Library', recent: 'Recent', favorites: 'Favorites', images: 'Images', videos: 'Videos', trash: 'Trash',
         }
         title.textContent = viewTitles[state.view] || 'Library'
         document.querySelectorAll('.library-nav').forEach(item => item.setAttribute('aria-current', item === button ? 'page' : 'false'))
@@ -955,6 +1126,7 @@
         root.setAttribute('aria-busy', 'true')
         page.setAttribute('aria-busy', 'true')
         try {
+            if (state.view === 'trash') { await searchLibrary(state.search); return }
             const recent = state.view === 'recent'
             const sort = recent ? 'sort=uploaded&' : ''
             const filesUrl = `/api/files/user/${encodeURIComponent(window.cdnAuthUser.id)}?${sort}limit=100&offset=0`
@@ -962,6 +1134,7 @@
                 api(withFilters(filesUrl)),
                 api(withSearch(`/api/files/user/${encodeURIComponent(window.cdnAuthUser.id)}/timeline`)),
             ])
+            if (request !== state.searchRequest) return
             if (recent) {
                 state.recentFiles = files
                 state.recentOffset = files.length
@@ -974,7 +1147,7 @@
             updateUserLoadMore()
             renderFiles()
         } catch (error) {
-            showError(error.message)
+            if (request === state.searchRequest) showError(error.message)
         }
     }))
     let searchTimer
@@ -985,6 +1158,8 @@
     })
 
     async function searchLibrary(search) {
+        state.selected.clear()
+        updateSelection()
         state.search = search
         const request = ++state.searchRequest
         root.replaceChildren(Object.assign(document.createElement('span'), {
@@ -994,7 +1169,14 @@
         page.setAttribute('aria-busy', 'true')
         loadMore.hidden = true
         try {
-            if (isPublic) {
+            if (state.view === 'trash') {
+                const files = await api(appendQuery('/api/files/trash?limit=100&offset=0', new URLSearchParams({ search })))
+                if (request !== state.searchRequest) return
+                state.files = files
+                state.trashOffset = files.length
+                state.months = []
+                loadMore.hidden = files.length < 100
+            } else if (isPublic) {
                 const album = await api(withFilters(`/api/albums/public/${encodeURIComponent(publicToken)}?limit=100&offset=0`))
                 if (request !== state.searchRequest) return
                 state.activeAlbum = album
@@ -1040,17 +1222,41 @@
         }
     }
     loadMore?.addEventListener('click', () => loadMoreFiles().catch(error => { loadMore.textContent = error.message }))
+    const moreObserver = new IntersectionObserver(entries => {
+        if (entries.some(entry => entry.isIntersecting) && !loadMore.hidden && !loadMore.disabled) {
+            loadMoreFiles().catch(error => { loadMore.textContent = error.message })
+        }
+    }, { rootMargin: '600px' })
+    const sentinel = document.querySelector('#scroll-sentinel')
+    if (sentinel) moreObserver.observe(sentinel)
+
 
     async function loadAlbums() {
         state.albums = await api('/api/albums')
         renderSidebar()
     }
     async function loadMoreFiles() {
+        if (loadMore.disabled || loadMore.hidden) return
+        const request = state.searchRequest
+        if (state.view === 'trash') {
+            loadMore.disabled = true
+            try {
+                const files = await api(appendQuery(`/api/files/trash?limit=100&offset=${state.trashOffset}`,
+                    new URLSearchParams({ search: state.search })))
+                if (request !== state.searchRequest) return
+                state.files.push(...files)
+                state.trashOffset += files.length
+                loadMore.hidden = files.length < 100
+                renderFiles()
+            } finally { loadMore.disabled = false }
+            return
+        }
         if (isPublic) {
             loadMore.disabled = true
             try {
                 const url = `/api/albums/public/${encodeURIComponent(publicToken)}?limit=100&offset=${state.albumOffset}`
                 const next = await api(withFilters(url))
+                if (request !== state.searchRequest) return
                 state.files.push(...next.items)
                 state.albumOffset += next.items.length
                 state.activeAlbum = next
@@ -1069,6 +1275,7 @@
                         `/api/files/user/${encodeURIComponent(window.cdnAuthUser.id)}?sort=uploaded&limit=100&offset=${state.recentOffset}`,
                     ),
                 )
+                if (request !== state.searchRequest) return
                 state.recentOffset += next.length
                 state.recentFiles.push(...next)
                 state.files = state.recentFiles
@@ -1082,6 +1289,7 @@
             try {
                 const url = `/api/albums/${encodeURIComponent(state.activeAlbum.id)}?limit=100&offset=${state.albumOffset}`
                 const next = await api(withFilters(url))
+                if (request !== state.searchRequest) return
                 state.files.push(...next.items)
                 state.activeAlbum = { ...next, items: state.files }
                 state.months = next.timeline || state.months
@@ -1095,6 +1303,7 @@
         try {
             const url = `/api/files/user/${encodeURIComponent(window.cdnAuthUser.id)}?limit=100&offset=${state.offset}`
             const next = await api(withFilters(url))
+            if (request !== state.searchRequest) return
             state.offset += next.length
             state.allFiles.push(...next)
             state.files = state.allFiles
@@ -1118,11 +1327,13 @@
         window.cdnAuth.then(async auth => {
             if (!auth?.id) return location.replace('/login?returnTo=%2Fgallery')
             window.cdnAuthUser = auth
+            const request = state.searchRequest
             const [, files, months] = await Promise.all([
                 loadAlbums(),
-                api(`/api/files/user/${encodeURIComponent(auth.id)}?limit=100&offset=0`),
+                api(withFilters(`/api/files/user/${encodeURIComponent(auth.id)}?limit=100&offset=0`)),
                 api(`/api/files/user/${encodeURIComponent(auth.id)}/timeline`),
             ])
+            if (request !== state.searchRequest) return
             state.allFiles = files
             state.files = files
             state.months = months

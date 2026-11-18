@@ -66,7 +66,8 @@ export default async function putFile(req: FastifyRequest, res: FastifyReply) {
     }
 
     values.push(id)
-    const sql = `UPDATE files SET ${updates.join(', ')} WHERE id = $${index} RETURNING id`
+    const sql = `UPDATE files SET ${updates.join(', ')} WHERE id = $${index}
+        AND deleted_at IS NULL AND purge_started_at IS NULL RETURNING id`
 
     try {
         let result
@@ -74,25 +75,31 @@ export default async function putFile(req: FastifyRequest, res: FastifyReply) {
             const finish = beginUpload(userId)
             let oldKey: string | undefined
             let oldThumbnailKey: string | undefined
+            let oldPlaybackKey: string | undefined
             try {
-                const current = await run('SELECT owner,type FROM files WHERE id=$1', [id])
+                const current = await run(`SELECT owner,type FROM files
+                    WHERE id=$1 AND deleted_at IS NULL AND purge_started_at IS NULL`, [id])
+                if (!current.rowCount) throw new StorageError(404, 'File not found')
                 const buffer = Buffer.from(data, 'base64')
                 const fileType = type || current.rows[0]?.type || 'application/octet-stream'
                 const metadata = readPhotoMetadata(buffer, fileType)
                 const thumbnail = await createPhotoThumbnail(buffer, fileType)
                 await persistFile(current.rows[0]?.owner || userId, buffer, async (client, key, thumbnailKey, thumbnailSize) => {
-                    const old = await client.query('SELECT storage_key,thumbnail_storage_key FROM files WHERE id=$1 FOR UPDATE', [id])
+                    const old = await client.query(`SELECT storage_key,thumbnail_storage_key,playback_storage_key FROM files
+                        WHERE id=$1 AND deleted_at IS NULL AND purge_started_at IS NULL FOR UPDATE`, [id])
                     if (!old.rows.length) throw new StorageError(404, 'File not found')
                     oldKey = old.rows[0].storage_key
                     oldThumbnailKey = old.rows[0].thumbnail_storage_key
+                    oldPlaybackKey = old.rows[0].playback_storage_key
                     result = await client.query(sql, values)
                     await client.query(`UPDATE files SET storage_key=$2,storage_size=$3,thumbnail_storage_key=$4,
-                        thumbnail_size=$5,thumbnail_processed=TRUE,photo_taken_at=$6,photo_taken_offset_minutes=$7,
+                        thumbnail_size=$5,thumbnail_processed=TRUE,playback_storage_key=NULL,playback_size=NULL,
+                        photo_taken_at=$6,photo_taken_offset_minutes=$7,
                         location_label=$8,latitude=$9,longitude=$10 WHERE id=$1`,
                     [id, key, buffer.length, thumbnailKey || null, thumbnailSize || null, metadata.photoTakenAt,
                         metadata.photoTakenOffsetMinutes, metadata.locationLabel, metadata.latitude, metadata.longitude])
                 }, id, thumbnail)
-                await removeStoredFiles([oldKey, oldThumbnailKey])
+                await removeStoredFiles([oldKey, oldThumbnailKey, oldPlaybackKey])
             } finally { finish() }
         } else result = await run(sql, values)
         if (!result) throw new Error('File update failed')

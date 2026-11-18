@@ -25,7 +25,8 @@ export default async function updateFavorite(
     if (typeof favorite !== 'boolean') return res.status(400).send({ error: 'favorite must be a boolean.' })
 
     const result = await run(
-        'UPDATE files SET is_favorite=$3 WHERE id=$1 AND owner=$2 RETURNING id,is_favorite',
+        `UPDATE files SET is_favorite=$3 WHERE id=$1 AND owner=$2
+            AND deleted_at IS NULL AND purge_started_at IS NULL RETURNING id,is_favorite`,
         [req.params.id, userId, favorite],
     )
     if (!result.rowCount) return res.status(404).send({ error: 'Photo not found.' })

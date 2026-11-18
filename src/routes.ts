@@ -1,3 +1,4 @@
+import { getTrash, restoreFile, permanentlyDeleteFile } from './handlers/files/trash.ts'
 import type { FastifyInstance } from 'fastify'
 import getIndex from './handlers/index/get.ts'
 import getFile from './handlers/files/get.ts'
@@ -66,6 +67,9 @@ export default async function apiRoutes(fastify: FastifyInstance) {
     fastify.get('/install.sh', getInstall)
 
     // files
+    fastify.get('/files/trash', getTrash)
+    fastify.post('/files/:id/restore', restoreFile)
+    fastify.delete('/files/:id/permanent', permanentlyDeleteFile)
     fastify.get('/files/check', checkPath)
     fastify.get('/files/path/:id', getFileByPath)
     fastify.get('/files/user/:id/timeline', getUserTimeline)

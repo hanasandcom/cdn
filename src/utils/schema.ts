@@ -54,6 +54,12 @@ export default async function ensureSchema() {
 
         await client.query(`
             ALTER TABLE files ADD COLUMN IF NOT EXISTS owner TEXT;
+            ALTER TABLE files ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ;
+            ALTER TABLE files ADD COLUMN IF NOT EXISTS restore_private BOOLEAN NOT NULL DEFAULT FALSE;
+            ALTER TABLE files ADD COLUMN IF NOT EXISTS purge_started_at TIMESTAMPTZ;
+            ALTER TABLE files ADD COLUMN IF NOT EXISTS playback_storage_key TEXT;
+            ALTER TABLE files ADD COLUMN IF NOT EXISTS playback_size BIGINT;
+            CREATE INDEX IF NOT EXISTS idx_files_trash ON files(owner, deleted_at DESC) WHERE deleted_at IS NOT NULL;
             ALTER TABLE files ADD COLUMN IF NOT EXISTS upload_key TEXT;
             ALTER TABLE files ADD COLUMN IF NOT EXISTS storage_key TEXT;
             ALTER TABLE files ADD COLUMN IF NOT EXISTS storage_size BIGINT;

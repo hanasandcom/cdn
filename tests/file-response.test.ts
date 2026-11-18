@@ -288,7 +288,7 @@ describe('standalone CDN pages', () => {
         expect(gallery).not.toContain('aria-label="Hanasand CDN"')
         expect(gallery).toContain('class="photo-viewer"')
         expect(() => new Function(galleryClient)).not.toThrow()
-        expect(galleryClient).toContain('preview.src = fileUrl(file.id, !isVideo)')
+        expect(galleryClient).toContain('preview.src = fileUrl(file.id, true)')
         expect(galleryClient).toContain('viewer.showModal()')
         expect(galleryClient).toContain('viewerImage.src = url')
         expect(galleryClient).toContain('const movePhoto = step =>')

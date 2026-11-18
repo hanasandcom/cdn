@@ -1,3 +1,4 @@
+import { purgeExpiredTrash } from '#utils/fileTrash.ts'
 import cors from '@fastify/cors'
 import Fastify from 'fastify'
 import routes from './routes.ts'
@@ -114,7 +115,23 @@ try {
     await ensureSchema()
     await prepareStorage()
     fastify.register(fp)
+    let cleanupTimer: ReturnType<typeof setTimeout> | undefined
+    let cleanupStopped = false
+    const cleanTrash = async () => {
+        let delay = 60 * 60 * 1000
+        try {
+            const result = await purgeExpiredTrash(5)
+            if (result.deleted === 5) delay = 5000
+        } catch (error) { fastify.log.error({ error }, 'Trash cleanup failed') }
+        if (!cleanupStopped) {
+            cleanupTimer = setTimeout(cleanTrash, delay)
+            cleanupTimer.unref()
+        }
+    }
+    fastify.addHook('onClose', async () => { cleanupStopped = true; clearTimeout(cleanupTimer) })
     await fastify.listen({ port, host: '0.0.0.0' })
+    cleanupTimer = setTimeout(cleanTrash, 30_000)
+    cleanupTimer.unref()
 } catch (error) {
     fastify.log.error(error)
     process.exit(1)
