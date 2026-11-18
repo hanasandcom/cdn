@@ -62,7 +62,7 @@ async function albumTimeline(albumId: string, search: string) {
         FROM photo_album_items pi JOIN files f ON f.id=pi.file_id
         WHERE pi.album_id=$1
           AND (f.type IN ('image/jpeg','image/png','image/gif','image/webp','image/avif','image/heic','image/heif',
-              'video/mp4','video/webm','video/ogg'))
+              'video/mp4','video/webm','video/ogg','video/quicktime'))
           AND ($2='' OR strpos(lower(f.name),lower($2))>0
               OR strpos(lower(concat_ws(' ',f.location_label,f.latitude::text,f.longitude::text)),lower($2))>0)
         GROUP BY 1 ORDER BY 1 DESC`, [albumId, search])
@@ -149,7 +149,7 @@ export async function getAlbum(req: FastifyRequest<{ Params: AlbumParams, Querys
         COALESCE(f.storage_size,octet_length(f.data)) AS size_bytes, pi.added_at, pi.added_by
         FROM photo_album_items pi JOIN files f ON f.id=pi.file_id
         WHERE pi.album_id=$1 AND f.type IN ('image/jpeg','image/png','image/gif','image/webp','image/avif','image/heic','image/heif',
-            'video/mp4','video/webm','video/ogg')
+            'video/mp4','video/webm','video/ogg','video/quicktime')
           AND ($4='' OR strpos(lower(f.name),lower($4))>0
             OR strpos(lower(concat_ws(' ',f.location_label,f.latitude::text,f.longitude::text)),lower($4))>0)
             AND ($5='' OR TO_CHAR(CASE WHEN f.photo_taken_at IS NOT NULL
@@ -160,7 +160,7 @@ export async function getAlbum(req: FastifyRequest<{ Params: AlbumParams, Querys
     [id, limit, offset, search, month]),
     run(`SELECT COUNT(*)::int AS total FROM photo_album_items pi JOIN files f ON f.id=pi.file_id
         WHERE pi.album_id=$1 AND f.type IN ('image/jpeg','image/png','image/gif','image/webp','image/avif','image/heic','image/heif',
-            'video/mp4','video/webm','video/ogg')
+            'video/mp4','video/webm','video/ogg','video/quicktime')
           AND ($2='' OR strpos(lower(f.name),lower($2))>0
             OR strpos(lower(concat_ws(' ',f.location_label,f.latitude::text,f.longitude::text)),lower($2))>0)
             AND ($3='' OR TO_CHAR(CASE WHEN f.photo_taken_at IS NOT NULL
@@ -297,7 +297,7 @@ export async function getPublicAlbum(req: FastifyRequest<{ Params: AlbumParams, 
         COALESCE(f.storage_size,octet_length(f.data)) AS size_bytes
         FROM photo_album_items pi JOIN files f ON f.id=pi.file_id
         WHERE pi.album_id=$1 AND f.type IN ('image/jpeg','image/png','image/gif','image/webp','image/avif','image/heic','image/heif',
-            'video/mp4','video/webm','video/ogg')
+            'video/mp4','video/webm','video/ogg','video/quicktime')
           AND ($4='' OR strpos(lower(f.name),lower($4))>0
             OR strpos(lower(concat_ws(' ',f.location_label,f.latitude::text,f.longitude::text)),lower($4))>0)
             AND ($5='' OR TO_CHAR(CASE WHEN f.photo_taken_at IS NOT NULL
@@ -309,7 +309,7 @@ export async function getPublicAlbum(req: FastifyRequest<{ Params: AlbumParams, 
     run(`SELECT COUNT(*)::int AS total
         FROM photo_album_items pi JOIN files f ON f.id=pi.file_id
         WHERE pi.album_id=$1 AND f.type IN ('image/jpeg','image/png','image/gif','image/webp','image/avif','image/heic','image/heif',
-            'video/mp4','video/webm','video/ogg') AND (
+            'video/mp4','video/webm','video/ogg','video/quicktime') AND (
             $2='' OR strpos(lower(f.name),lower($2))>0
             OR strpos(lower(concat_ws(' ',f.location_label,f.latitude::text,f.longitude::text)),lower($2))>0
         ) AND ($3='' OR TO_CHAR(CASE WHEN f.photo_taken_at IS NOT NULL

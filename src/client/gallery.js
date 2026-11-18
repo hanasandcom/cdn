@@ -314,7 +314,7 @@
         state.photoIndex = index
         const file = state.photos[index]
         const url = fileUrl(file.id)
-        const isVideo = /^video\/(mp4|webm|ogg)$/i.test(file.type)
+        const isVideo = /^video\/(mp4|webm|ogg|quicktime)$/i.test(file.type)
         viewerImage.hidden = isVideo
         viewerVideo.hidden = !isVideo
         viewerVideo.pause()
@@ -532,7 +532,7 @@
         page.setAttribute('aria-busy', 'false')
         root.replaceChildren()
         const filtered = state.files.filter(file => /^image\/(jpeg|png|gif|webp|avif|heic|heif)$/i.test(file.type)
-            || /^video\/(mp4|webm|ogg)$/i.test(file.type))
+            || /^video\/(mp4|webm|ogg|quicktime)$/i.test(file.type))
             .sort((a, b) => new Date(b.photo_taken_at || b.uploaded_at) - new Date(a.photo_taken_at || a.uploaded_at))
         state.photos = filtered
         renderTimeline(filtered)
@@ -578,7 +578,7 @@
                 const open = document.createElement('button')
                 open.type = 'button'
                 open.setAttribute('aria-label', `View ${file.name}`)
-                const isVideo = /^video\/(mp4|webm|ogg)$/i.test(file.type)
+                const isVideo = /^video\/(mp4|webm|ogg|quicktime)$/i.test(file.type)
                 const preview = document.createElement(isVideo ? 'video' : 'img')
                 preview.className = 'preview'
                 preview.src = fileUrl(file.id, !isVideo)

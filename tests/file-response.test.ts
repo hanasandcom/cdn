@@ -64,6 +64,9 @@ describe('file response safety', () => {
 
         expect(image['Content-Type']).toBe('image/png')
         expect(image['Content-Disposition']).toStartWith('inline;')
+        const quicktime = fileResponseHeaders('IMG_0001.MOV', 'video/quicktime')
+        expect(quicktime['Content-Type']).toBe('video/quicktime')
+        expect(quicktime['Content-Disposition']).toStartWith('inline;')
         expect(html['Content-Type']).toBe('application/octet-stream')
         expect(html['Content-Disposition']).toStartWith('attachment;')
     })

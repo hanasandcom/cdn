@@ -42,16 +42,16 @@ export default async function getUserTimeline(
             FROM files
             WHERE owner=$1
               AND type IN ('image/jpeg','image/png','image/gif','image/webp','image/avif','image/heic','image/heif',
-                  'video/mp4','video/webm','video/ogg')
+                  'video/mp4','video/webm','video/ogg','video/quicktime')
               AND ($2='' OR strpos(lower(name),lower($2))>0
                   OR strpos(lower(concat_ws(' ',location_label,latitude::text,longitude::text)),lower($2))>0)
               AND ($3='' OR is_favorite)
               AND ($4='' OR ($4='all' AND type IN (
                     'image/jpeg','image/png','image/gif','image/webp','image/avif','image/heic','image/heif',
-                    'video/mp4','video/webm','video/ogg'
+                    'video/mp4','video/webm','video/ogg','video/quicktime'
                   )) OR ($4='images' AND type IN (
                     'image/jpeg','image/png','image/gif','image/webp','image/avif','image/heic','image/heif'
-                  )) OR ($4='videos' AND type IN ('video/mp4','video/webm','video/ogg')))
+                  )) OR ($4='videos' AND type IN ('video/mp4','video/webm','video/ogg','video/quicktime')))
             GROUP BY 1 ORDER BY 1 DESC`, [id, search, favorites, media])
         return res.send(result.rows)
     } catch (error) {

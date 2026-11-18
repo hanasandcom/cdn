@@ -75,10 +75,10 @@ export default async function getUserFiles(
                AND ($6 = '' OR is_favorite)
                AND ($7 = '' OR ($7='all' AND type IN (
                         'image/jpeg','image/png','image/gif','image/webp','image/avif','image/heic','image/heif',
-                        'video/mp4','video/webm','video/ogg'
+                        'video/mp4','video/webm','video/ogg','video/quicktime'
                     )) OR ($7='images' AND type IN (
                         'image/jpeg','image/png','image/gif','image/webp','image/avif','image/heic','image/heif'
-                    )) OR ($7='videos' AND type IN ('video/mp4','video/webm','video/ogg')))
+                    )) OR ($7='videos' AND type IN ('video/mp4','video/webm','video/ogg','video/quicktime')))
              ORDER BY ${order}
              LIMIT $2 OFFSET $3`,
             [id, limit, offset, search, month, favorites, media]

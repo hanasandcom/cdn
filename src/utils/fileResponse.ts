@@ -1,6 +1,6 @@
 const inlineTypes = new Set([
     'image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/avif', 'image/heic', 'image/heif',
-    'video/mp4', 'video/webm', 'video/ogg',
+    'video/mp4', 'video/webm', 'video/ogg', 'video/quicktime',
 ])
 
 export function fileResponseHeaders(name: string, declaredType: string) {
