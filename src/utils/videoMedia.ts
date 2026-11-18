@@ -40,10 +40,11 @@ export async function createVideoDerivative(input: string, output: string, varia
     const options = variant === 'thumbnail'
         ? ['-frames:v', '1', '-vf', 'scale=480:480:force_original_aspect_ratio=decrease',
             '-an', '-c:v', 'png', '-threads', '2', '-f', 'image2']
-        : ['-map', '0:a:0?', '-vf', 'scale=w=\'min(1280,iw)\':h=\'min(720,ih)\':force_original_aspect_ratio=decrease:force_divisible_by=2',
-            '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '23', '-maxrate', '4M', '-bufsize', '8M',
-            '-pix_fmt', 'yuv420p', '-r', '30', '-threads', '2', '-c:a', 'aac', '-b:a', '128k', '-ac', '2',
-            '-movflags', '+faststart', '-fs', String(maxPlaybackBytes), '-f', 'mp4']
+        : ['-map', '0:a:0?', '-vf', 'scale=w=\'min(1280,iw)\':h=\'min(720,ih)\':force_original_aspect_ratio=decrease'
+                + ':force_divisible_by=2:out_range=tv',
+        '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '23', '-maxrate', '4M', '-bufsize', '8M',
+        '-pix_fmt', 'yuv420p', '-color_range', 'tv', '-r', '30', '-threads', '2', '-c:a', 'aac', '-b:a', '128k', '-ac', '2',
+        '-movflags', '+faststart', '-fs', String(maxPlaybackBytes), '-f', 'mp4']
     const encodedOutput = variant === 'thumbnail' ? `${output}.png` : output
     try {
         await execute('ffmpeg', [...common, ...options, encodedOutput], {
@@ -113,7 +114,7 @@ async function drain(log: { warn: (data: object, message: string) => void }) {
             try { await processVideo(id, job) } catch (error) {
                 failures.set(id, Date.now() + 60_000)
                 if (failures.size > 256) failures.delete(failures.keys().next().value!)
-                log.warn({ error, fileId: id }, 'Video preview generation failed')
+                log.warn({ err: error, fileId: id }, 'Video preview generation failed')
             } finally { jobs.delete(id) }
         }
     } finally { running = false }

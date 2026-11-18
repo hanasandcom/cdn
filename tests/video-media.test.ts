@@ -31,6 +31,7 @@ async function query(sql: string, values: unknown[] = []) {
         && row.storage_key === values[1] ? [{ ...row }] : [])
     if (sql.includes('UPDATE files SET')) {
         if (failAttach) throw Error('Synthetic database write failure')
+        if (!row) throw Error('Synthetic file is missing')
         const variant = sql.includes('SET playback') ? 'playback' : 'thumbnail'
         row[`${variant}_storage_key`] = values[1]
         row[`${variant}_size`] = values[2]
@@ -141,7 +142,7 @@ test('private originals and derivatives enforce the same access before disk read
 })
 
 test('trashed files expose only an existing thumbnail to their owner; restored-private files stay private', async () => {
-    const row = rows.get('private')
+    const row = rows.get('private')!
     row.deleted_at = new Date()
     for (const url of ['/files/private', '/paths/private-path']) {
         for (const variant of ['', '?variant=playback', '?variant=thumbnail', '?variant=playback&trash=1']) {
@@ -176,8 +177,8 @@ test('background job responds promptly, reuses cached derivatives and preserves 
     expect(first.headers['retry-after']).toBe('2')
     expect(first.body).toBe('')
     const deadline = Date.now() + 20_000
-    while (!rows.get('queued').playback_storage_key && Date.now() < deadline) await Bun.sleep(50)
-    const row = rows.get('queued')
+    while (!rows.get('queued')!.playback_storage_key && Date.now() < deadline) await Bun.sleep(50)
+    const row = rows.get('queued')!
     expect(row.playback_storage_key).toBeTruthy()
     expect(row.thumbnail_storage_key).toBeTruthy()
     const reads = generationReads
@@ -195,10 +196,10 @@ test('derivative attachment refuses trashed, purging and replaced sources and re
     rows.set('attach', { id: 'attach', storage_key: sourceKey, deleted_at: new Date() })
     await writeFile(temporary, 'synthetic poster')
     expect(await storeVideoDerivative('attach', sourceKey, 'thumbnail', temporary)).toBe(false)
-    rows.get('attach').deleted_at = null
-    rows.get('attach').purge_started_at = new Date()
+    rows.get('attach')!.deleted_at = null
+    rows.get('attach')!.purge_started_at = new Date()
     expect(await storeVideoDerivative('attach', sourceKey, 'thumbnail', temporary)).toBe(false)
-    rows.get('attach').purge_started_at = null
+    rows.get('attach')!.purge_started_at = null
     expect(await storeVideoDerivative('attach', randomUUID(), 'thumbnail', temporary)).toBe(false)
     const before = await readdir(directory)
     failAttach = true
@@ -248,4 +249,20 @@ test('long native MP4 posters are not rejected by playback conversion duration l
     expect((await readFile(poster)).subarray(8, 12).toString()).toBe('WEBP')
     await expect(createVideoDerivative(longVideo, join(directory, 'long-converted.mp4'), 'playback'))
         .rejects.toThrow('playback conversion limits')
+}, 30_000)
+
+test('full-range iPhone-style MOV is converted to browser-compatible limited-range video', async () => {
+    const input = join(directory, 'full-range.mov')
+    const output = join(directory, 'full-range.mp4')
+    await execute('ffmpeg', ['-v', 'error', '-f', 'lavfi', '-i', 'testsrc2=size=160x120:rate=10',
+        '-t', '1', '-vf', 'scale=in_range=tv:out_range=pc', '-c:v', 'libx264',
+        '-pix_fmt', 'yuvj420p', '-color_range', 'pc', input])
+    expect((await probeVideo(input)).stream.pix_fmt).toBe('yuvj420p')
+    const before = hash(await readFile(input))
+    await createVideoDerivative(input, output, 'playback')
+    const result = await probeVideo(output)
+    expect(result.stream.codec_name).toBe('h264')
+    expect(result.stream.pix_fmt).toBe('yuv420p')
+    expect(result.stream.color_range).not.toBe('pc')
+    expect(hash(await readFile(input))).toBe(before)
 }, 30_000)
