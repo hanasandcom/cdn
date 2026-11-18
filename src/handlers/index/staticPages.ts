@@ -324,6 +324,17 @@ hanasand-upload-picker:defined > .picker-fallback { display: none; }
     background: #191919; color: #eee; padding: .55rem; font-size: .8rem;
 }
 .library-content { min-width: 0; padding: 1.15rem 1.35rem 2.5rem; }
+.library-controls {
+    position: sticky; top: var(--gallery-header-height, 3.5rem); z-index: 4;
+    isolation: isolate; padding-top: .75rem; margin-top: -.75rem;
+}
+.library-controls::before {
+    content: ''; position: absolute; inset: 0 -1.35rem -2rem; z-index: -1; pointer-events: none;
+    background: linear-gradient(to bottom, #070707 0%, #070707f5 65%, #070707b3 85%, #07070700 100%);
+}
+:root[data-theme="light"] .library-controls::before {
+    background: linear-gradient(to bottom, #f4f5f7 0%, #f4f5f7f5 65%, #f4f5f7b3 85%, #f4f5f700 100%);
+}
 .library-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 1rem; margin-bottom: 1.15rem; }
 .library-toolbar h2 { margin: 0; font-size: 1.35rem; }
 .library-actions { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem; }
@@ -459,7 +470,7 @@ hanasand-upload-picker:defined > .picker-fallback { display: none; }
     .gallery-page > header { min-height: 3rem; padding: .5rem .8rem; }
     .photo-library-layout { position: relative; display: block; min-height: calc(100vh - 3rem); }
     .library-sidebar {
-        display: none; position: absolute; z-index: 8; top: .35rem; left: .5rem;
+        display: none; position: fixed; z-index: 8; top: calc(var(--gallery-header-height, 3rem) + .35rem); left: .5rem;
         width: min(20rem, calc(100vw - 1rem)); height: auto; max-height: calc(100dvh - 4rem);
         overflow-y: auto; padding: 1rem; border: 1px solid #383838; border-radius: .85rem;
         background: #101010; box-shadow: 0 1rem 2rem #0009;
@@ -470,6 +481,7 @@ hanasand-upload-picker:defined > .picker-fallback { display: none; }
     .library-sidebar-content { gap: .85rem; }
     .library-nav, .album-nav { padding: .5rem; }
     .library-content { padding: .85rem .8rem 2rem; }
+    .library-controls::before { left: -.8rem; right: -.8rem; }
     .library-toolbar { display: grid; align-items: start; gap: .6rem; margin-bottom: .75rem; }
     .library-toolbar h2 { font-size: 1.2rem; }
     .library-actions { display: grid; width: 100%; min-width: 0; grid-template-columns: auto minmax(0, 1fr); gap: .45rem; }
@@ -690,6 +702,7 @@ aria-expanded="true" aria-label="Collapse sidebar" title="Collapse sidebar">
 </div>
 </aside>
 <section class="library-content" aria-label="Photos">
+<div class="library-controls">
 <div class="library-toolbar"><h2 id="view-title">Library</h2><div class="library-actions">
 <input id="photo-search" type="search" placeholder="Search photos" aria-label="Search photos" autocomplete="off">
 <label class="grid-density-control" title="Images per row">
@@ -713,6 +726,7 @@ aria-expanded="true" aria-label="Collapse sidebar" title="Collapse sidebar">
 </div></div>
 <p id="album-status" class="album-status" role="status" hidden></p>
 <div id="date-timeline" class="date-timeline" aria-label="Browse by date" hidden></div>
+</div>
 <div id="files" class="library-grid" aria-live="polite" aria-busy="true">
 <span class="loading-indicator" role="status" aria-label="Loading photos"></span></div>
 <div id="scroll-sentinel" aria-hidden="true"></div>
@@ -749,8 +763,10 @@ export async function getSharedAlbumPage(req: FastifyRequest, res: FastifyReply)
     const body = `<div id="photo-library" class="photo-library-layout public-library"
     data-public-token="${encodeURIComponent(token)}" aria-busy="true">
 <section class="library-content" aria-label="Shared album">
+<div class="library-controls">
 <div class="library-toolbar"><h2 id="view-title">Shared album</h2></div>
 <div id="date-timeline" class="date-timeline" aria-label="Browse by date" hidden></div>
+</div>
 <div id="files" class="library-grid" aria-live="polite" aria-busy="true">
 <span class="loading-indicator" role="status" aria-label="Loading photos"></span></div>
 <div id="scroll-sentinel" aria-hidden="true"></div>

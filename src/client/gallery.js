@@ -1,7 +1,17 @@
-/* global CSS, window, document, location, navigator, fetch, Option, URLSearchParams, clearTimeout, setTimeout, localStorage, IntersectionObserver */
+/* global CSS, window, document, location, navigator, fetch, Option, URLSearchParams, clearTimeout, setTimeout, localStorage, IntersectionObserver, ResizeObserver */
 (() => {
     const page = document.querySelector('#photo-library')
     if (!page) return
+    window.history.scrollRestoration = 'manual'
+
+    const header = document.querySelector('.gallery-page > header')
+    if (header) {
+        const updateHeaderHeight = () => page.style.setProperty(
+            '--gallery-header-height', `${header.getBoundingClientRect().height}px`,
+        )
+        updateHeaderHeight()
+        new ResizeObserver(updateHeaderHeight).observe(header)
+    }
 
     const root = document.querySelector('#files')
     const title = document.querySelector('#view-title')
